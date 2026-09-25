@@ -5,7 +5,7 @@ world (live web) and with words (long text) — no programming required.
 
 | demo | tests | how to run |
 |---|---|---|
-| `01-coding-bob` | code from spec + test loop | `opencode run -m ollama/muse-glimmer:30b-mlx "implement bob.py so all tests pass"`, then `../../.venv/bin/python -m pytest bob_test.py -q` |
+| `01-coding-bob` | code from spec + test loop | `opencode run -m ollama/qwen3-coder:30b "implement bob.py so all tests pass"`, then `../../.venv/bin/python -m pytest bob_test.py -q` |
 | `02-internet-research` | live-web facts + citations, no code | answer TASK.md into `answers.md` (curl, browser, or agent web tools), then `python3 check.py` |
 | `03-text-alice` | RAG over a 151KB book, no code | ingest + `--query` per TASK.md, write `answers.md`, then `python3 check.py` |
 
