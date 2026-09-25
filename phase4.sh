@@ -172,15 +172,15 @@ ensure_opencode() {
     return 0
   fi
   if [[ "$DRY_RUN" -eq 1 ]]; then
-    log "[dry-run] would merge opencode-ollama-provider.json into $OPENCODE_CFG"
+    log "[dry-run] would merge provider.ollama into $OPENCODE_CFG"
     return 0
   fi
-  # Merge (never clobber): provider definition comes from the sidecar file
-  # opencode-ollama-provider.json; the models block is built from
-  # `ollama list` so the picker shows every chat model. Embedding-only
-  # models can't chat and are skipped; every proven agentic model is
-  # flagged tool_call (the 32Bs narrate calls as text).
-  local template="$ROOT_DIR/opencode-ollama-provider.json"
+  # Merge (never clobber): provider definition comes from the template in
+  # configs/; the models block is built from `ollama list` so the picker
+  # shows every chat model. Embedding-only models can't chat and are
+  # skipped; every proven agentic model is flagged tool_call (the 32Bs
+  # narrate calls as text).
+  local template="$ROOT_DIR/configs/opencode-ollama-provider.json"
   [[ -f "$template" ]] || { warn "provider template missing: $template"; return 1; }
   AGENT_MODELS="$AGENT_MODELS" OPENCODE_CFG="$OPENCODE_CFG" \
     PROVIDER_TEMPLATE="$template" "$VENV_PY" - <<'EOF'

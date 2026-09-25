@@ -72,6 +72,8 @@ preflight() {
   fi
   (cd "$ROOT_DIR" && git rev-parse --is-inside-work-tree >/dev/null 2>&1) \
     || die "not a git checkout (stub restore needs git)."
+  [[ -f "$ROOT_DIR/configs/opencode-eval-permissions.json" ]] \
+    || die "configs/opencode-eval-permissions.json missing."
   log "preflight OK (models: $MODELS; demos: $DEMOS; timeout: ${TIMEOUT}s)."
 }
 
@@ -180,7 +182,7 @@ run_one() {
   runlog="$rundir/run.log"
   reset_demo "$demo"
   dir="$(demo_dir "$demo")"
-  printf '{"permission":{"edit":"allow","bash":"allow"}}' > "$dir/opencode.json"
+  cp "$ROOT_DIR/configs/opencode-eval-permissions.json" "$dir/opencode.json"
   log "run: $model demo $demo (timeout ${TIMEOUT}s)..."
   local start=$SECONDS
   # shellcheck disable=SC2086

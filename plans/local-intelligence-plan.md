@@ -84,8 +84,8 @@ Phase 4 — chat UI with RAG (the friendly front door):
   - Install: `brew install opencode`, or the user-local installer
     `curl -fsSL https://opencode.ai/install | bash -s -- --version <stable>`
     (pin the version; the unpinned lookup hits GitHub API rate limits)
-  - Status: implemented + verified by `phase4.sh`. Provider definition lives
-    in `opencode-ollama-provider.json` next to the script and is merged into
+  - Status: implemented + verified by `phase4.sh`. Provider definition
+    lives in `configs/opencode-ollama-provider.json` and is merged into
     `~/.config/opencode/opencode.jsonc` under `provider.ollama` (other keys
     never clobbered; schema taken from `https://opencode.ai/config.json`).
     It declares every Ollama chat model (embedding-only excluded);
@@ -345,10 +345,14 @@ use + `streamable-http` for clients, tools: `rag_query`, `rag_ingest`,
 Client side — one script does it all (`client-setup.sh`, self-contained,
 macOS with Homebrew or apt/dnf Linux; Windows via WSL2):
 
-1. Copy it over: `scp client-setup.sh user@client:~/`
-2. On the client: `bash ~/client-setup.sh` (`--server HOST` to override
-   the default `compute.local`, e.g. the server's LAN IP if mDNS fails;
-   `--dry-run` / `--check-only` supported).
+1. Copy it over with its configs:
+   `scp -r client-setup.sh configs user@client:~/local-intel-client/`
+2. On the client: `bash ~/local-intel-client/client-setup.sh`
+   (`--server HOST` to override the default `compute.local`, e.g. the
+   server's LAN IP if mDNS fails; `--dry-run` / `--check-only`
+   supported). Client Continue/opencode values come from
+   `configs/continue-client-config.yaml` and
+   `configs/opencode-client-defaults.json` — edit those, not the script.
 3. It installs the Continue extension (needs VS Code with `code` on
    PATH already — not installed by the script), writes
    `~/.continue/config.yaml` (server models, tool-pin rules, remote

@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 # client-setup.sh — set up a CLIENT machine against a local-intelligence server.
-# Self-contained: needs only this file (no repo checkout). Supports macOS
-# (needs Homebrew) and Linux (apt- or dnf-based). Windows: use WSL2, then
-# follow the Linux path. Requires VS Code already installed (with the
-# `code` CLI on PATH) — the script does not install it.
+# Needs this script plus the configs/ directory beside it (no full repo
+# checkout). Supports macOS (needs Homebrew) and Linux (apt- or dnf-based).
+# Windows: use WSL2, then follow the Linux path. Requires VS Code already
+# installed (with the `code` CLI on PATH) — the script does not install it.
 #
 # Installs + configures, all pointed at the server:
 #   - Continue extension + ~/.continue/config.yaml
 #     (models via http://SERVER:11434, RAG via http://SERVER:8011/mcp)
 #   - opencode + ~/.config/opencode/opencode.jsonc (same server wiring)
 #
-# Get it onto the client (server's repo root has this file):
-#   scp client-setup.sh user@client:~/ && ssh user@client 'bash ~/client-setup.sh'
+# Get it onto the client (server's repo root has both):
+#   scp -r client-setup.sh configs user@client:~/local-intel-client/ \
+#     && ssh user@client 'bash ~/local-intel-client/client-setup.sh'
 # Server prerequisites (else the script warns/fails): Ollama reachable at
 # SERVER:11434 (phase 5) and the RAG MCP service at SERVER:8011 (plan section 9).
 set -euo pipefail
@@ -20,6 +21,8 @@ SERVER="${SERVER_HOST:-compute.local}"
 MCP_PORT="${MCP_PORT:-8011}"
 DRY_RUN=0
 CHECK_ONLY=0
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_DIR="${CLIENT_CONFIG_DIR:-$SCRIPT_DIR/configs}"
 
 log() { printf '[client-setup] %s\n' "$*"; }
 warn() { printf '[client-setup] WARN: %s\n' "$*" >&2; }
@@ -56,6 +59,8 @@ server_up() { curl -sf --max-time 5 "http://$SERVER:11434/api/tags" >/dev/null 2
 mcp_up() { curl -s --max-time 5 -o /dev/null "http://$SERVER:$MCP_PORT/mcp" 2>/dev/null; }
 
 preflight() {
+  [[ -f "$CONFIG_DIR/continue-client-config.yaml" && -f "$CONFIG_DIR/opencode-client-defaults.json" ]] \
+    || die "configs/ not found beside the script (want $CONFIG_DIR) — copy the script AND the configs directory (see header)."
   server_up || die "server Ollama unreachable at http://$SERVER:11434 — check the server (phase 5) and --server."
   if mcp_up; then
     log "server RAG MCP reachable at http://$SERVER:$MCP_PORT/mcp."
@@ -88,74 +93,8 @@ write_continue_config() {
     cp -p "$cfg" "$cfg.bak.$(date +%Y%m%d-%H%M%S)"
     log "backed up existing $cfg."
   fi
-  sed "s/__SERVER__/$SERVER/g; s/__MCP_PORT__/$MCP_PORT/g" > "$cfg" <<'EOF'
-# Local-intelligence client config (written by client-setup.sh).
-# Models + embeddings served by the server; @codebase indexes THIS machine's
-# open workspace. First chat model = picker default (use it for Agent mode).
-name: Local Config (client)
-version: 0.0.1
-schema: v1
-models:
-  - name: Muse Glimmer 30B (agentic)
-    provider: ollama
-    model: muse-glimmer:30b-mlx
-    apiBase: http://__SERVER__:11434
-    roles:
-      - chat
-    capabilities:
-      - tool_use
-      - image_input
-  - name: GPT-OSS 120B (heavyweight)
-    provider: ollama
-    model: gpt-oss:120b
-    apiBase: http://__SERVER__:11434
-    roles:
-      - chat
-    capabilities:
-      - tool_use
-  - name: Qwen3-Coder 30B (agentic)
-    provider: ollama
-    model: qwen3-coder:30b
-    apiBase: http://__SERVER__:11434
-    roles:
-      - chat
-    capabilities:
-      - tool_use
-  - name: Qwen2.5-Coder 32B
-    provider: ollama
-    model: qwen2.5-coder:32b
-    apiBase: http://__SERVER__:11434
-    roles:
-      - chat
-      - edit
-      - apply
-  - name: DeepSeek R1 32B (reasoning)
-    provider: ollama
-    model: deepseek-r1:32b
-    apiBase: http://__SERVER__:11434
-    roles:
-      - chat
-  - name: Nomic Embed Text
-    provider: ollama
-    model: nomic-embed-text
-    apiBase: http://__SERVER__:11434
-    roles:
-      - embed
-  - name: Qwen2.5-Coder 1.5B
-    provider: ollama
-    model: qwen2.5-coder:1.5b
-    apiBase: http://__SERVER__:11434
-    roles:
-      - autocomplete
-rules:
-  - "Agent tools - exact names and arguments only: read_file(filepath), read_file_range(filepath, startLine, endLine), create_new_file(filepath, contents), grep_search(query), file_glob_search(pattern), ls(dirPath), run_terminal_command(command), fetch_url_content(url), search_web(query). Lowercase filepath/contents/query - never filePath, fileContent, or pattern for grep. Never invent variants like file_read, run_terminal, run_shell_command, or fetch_url."
-mcpServers:
-  # Remote only: stdio would spawn on THIS machine, where the RAG index
-  # doesn't live. Served by the server over HTTP (plan section 9).
-  - name: rag
-    type: streamable-http
-    url: http://__SERVER__:__MCP_PORT__/mcp
-EOF
+  sed "s/__SERVER__/$SERVER/g; s/__MCP_PORT__/$MCP_PORT/g" \
+    "$CONFIG_DIR/continue-client-config.yaml" > "$cfg"
   log "wrote $cfg."
 }
 
@@ -179,21 +118,24 @@ write_opencode_config() {
     cp -p "$cfg" "$cfg.bak.$(date +%Y%m%d-%H%M%S)"
     log "backed up existing $cfg."
   fi
-  SERVER="$SERVER" MCP_PORT="$MCP_PORT" OPENCODE_CFG="$cfg" python3 - <<'EOF'
+  SERVER="$SERVER" MCP_PORT="$MCP_PORT" OPENCODE_CFG="$cfg" \
+    CLIENT_DEFAULTS="$CONFIG_DIR/opencode-client-defaults.json" python3 - <<'EOF'
 import json, os, urllib.request
-server, port, p = os.environ["SERVER"], os.environ["MCP_PORT"], os.environ["OPENCODE_CFG"]
+server, port, p = (os.environ["SERVER"], os.environ["MCP_PORT"],
+                   os.environ["OPENCODE_CFG"])
+defs = json.load(open(os.environ["CLIENT_DEFAULTS"]))
 with urllib.request.urlopen(f"http://{server}:11434/api/tags", timeout=15) as r:
     names = [m["name"] for m in json.load(r).get("models", [])]
-agents = {"muse-glimmer:30b-mlx", "gpt-oss:120b", "qwen3-coder:30b"}
+agents = set(defs["model_order"])
 models = {}
 for m in names:
-    if any(s in m for s in ("embed", "bge-m3", "mxbai")):
+    if any(s in m for s in defs.get("skip_substrings", [])):
         continue
     agentic = m in agents
     models[m] = {
-        "name": m + (" (remote, agentic)" if agentic else " (remote)"),
+        "name": m + (defs["agentic_name_suffix"] if agentic else defs["model_name_suffix"]),
         "tool_call": agentic,
-        "limit": {"context": 32768, "output": 8192},
+        "limit": defs["default_limit"],
     }
 if not models:
     raise SystemExit("no chat models on server (is Ollama serving any?)")
@@ -202,22 +144,24 @@ try:
 except ValueError as e:
     raise SystemExit(f"refusing to touch {p} (not plain JSON): {e}")
 d.setdefault("$schema", "https://opencode.ai/config.json")
-order = ["qwen3-coder:30b", "gpt-oss:120b", "muse-glimmer:30b-mlx"]
+order = defs["model_order"]
 default = next((f"ollama/{m}" for m in order if m in models), None)
 if default:
     d["model"] = default
-small = "ollama/qwen2.5-coder:1.5b" if "qwen2.5-coder:1.5b" in models else default
+small = defs.get("small_model")
+small = f"ollama/{small}" if small in models else default
 if small:
     d["small_model"] = small
 print(f"default model: {default}, small model: {small}")
 provs = d.setdefault("provider", {})
 provs["ollama"] = {
-    "npm": "@ai-sdk/openai-compatible",
-    "name": "Ollama (server)",
+    "npm": defs["npm"],
+    "name": defs["provider_name"],
     "options": {"baseURL": f"http://{server}:11434/v1"},
     "models": models,
 }
-d.setdefault("mcp", {})["rag"] = {"type": "remote", "url": f"http://{server}:{port}/mcp"}
+d.setdefault("mcp", {})[defs.get("mcp_name", "rag")] = {
+    "type": "remote", "url": f"http://{server}:{port}/mcp"}
 json.dump(d, open(p, "w"), indent=2)
 print(f"provider.ollama + mcp.rag written ({len(models)} models)")
 EOF

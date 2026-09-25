@@ -1,0 +1,67 @@
+# Local-intelligence client config template (read by client-setup.sh).
+# __SERVER__ / __MCP_PORT__ are substituted at install time.
+# Models + embeddings served by the server; @codebase indexes the CLIENT's
+# open workspace. First chat model = picker default (use it for Agent mode).
+name: Local Config (client)
+version: 0.0.1
+schema: v1
+models:
+  - name: Muse Glimmer 30B (agentic)
+    provider: ollama
+    model: muse-glimmer:30b-mlx
+    apiBase: http://__SERVER__:11434
+    roles:
+      - chat
+    capabilities:
+      - tool_use
+      - image_input
+  - name: GPT-OSS 120B (heavyweight)
+    provider: ollama
+    model: gpt-oss:120b
+    apiBase: http://__SERVER__:11434
+    roles:
+      - chat
+    capabilities:
+      - tool_use
+  - name: Qwen3-Coder 30B (agentic)
+    provider: ollama
+    model: qwen3-coder:30b
+    apiBase: http://__SERVER__:11434
+    roles:
+      - chat
+    capabilities:
+      - tool_use
+  - name: Qwen2.5-Coder 32B
+    provider: ollama
+    model: qwen2.5-coder:32b
+    apiBase: http://__SERVER__:11434
+    roles:
+      - chat
+      - edit
+      - apply
+  - name: DeepSeek R1 32B (reasoning)
+    provider: ollama
+    model: deepseek-r1:32b
+    apiBase: http://__SERVER__:11434
+    roles:
+      - chat
+  - name: Nomic Embed Text
+    provider: ollama
+    model: nomic-embed-text
+    apiBase: http://__SERVER__:11434
+    roles:
+      - embed
+  - name: Qwen2.5-Coder 1.5B
+    provider: ollama
+    model: qwen2.5-coder:1.5b
+    apiBase: http://__SERVER__:11434
+    roles:
+      - autocomplete
+rules:
+  - "Agent tools - exact names and arguments only: read_file(filepath), read_file_range(filepath, startLine, endLine), create_new_file(filepath, contents), grep_search(query), file_glob_search(pattern), ls(dirPath), run_terminal_command(command), fetch_url_content(url), search_web(query). Lowercase filepath/contents/query - never filePath, fileContent, or pattern for grep. Never invent variants like file_read, run_terminal, run_shell_command, or fetch_url."
+mcpServers:
+  # Remote only: stdio would spawn on THIS machine, where the RAG index
+  # doesn't live. Served by the server over HTTP (plan section 9).
+  - name: rag
+    type: streamable-http
+    url: http://__SERVER__:__MCP_PORT__/mcp
