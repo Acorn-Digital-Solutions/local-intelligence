@@ -11,5 +11,6 @@
     "output": 8192
   },
   "skip_substrings": ["embed", "bge-m3", "mxbai"],
-  "mcp_name": "rag"
+  "mcp_name": "rag",
+  "agent_tools_mcp_name": "agent-tools"
 }

@@ -19,6 +19,7 @@ set -euo pipefail
 
 SERVER="${SERVER_HOST:-compute.local}"
 MCP_PORT="${MCP_PORT:-8011}"
+TOOLS_MCP_PORT="${AGENT_TOOLS_MCP_PORT:-8012}"
 DRY_RUN=0
 CHECK_ONLY=0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -36,6 +37,7 @@ Options:
   --server HOST  local-intelligence server (default: compute.local,
                  env SERVER_HOST). Fall back to its LAN IP if mDNS fails.
   --mcp-port P   RAG MCP port on the server (default: 8011, env MCP_PORT)
+  --tools-mcp-port P  agent-tools MCP port (default: 8012, env AGENT_TOOLS_MCP_PORT)
   --dry-run      Print what would change, do nothing
   --check-only   Verify server reachability + what is installed, change nothing
   -h, --help     Show this help
@@ -56,16 +58,21 @@ detect_os() {
 }
 
 server_up() { curl -sf --max-time 5 "http://$SERVER:11434/api/tags" >/dev/null 2>&1; }
-mcp_up() { curl -s --max-time 5 -o /dev/null "http://$SERVER:$MCP_PORT/mcp" 2>/dev/null; }
+mcp_up() { curl -s --max-time 5 -o /dev/null "http://$SERVER:$1/mcp" 2>/dev/null; }
 
 preflight() {
   [[ -f "$CONFIG_DIR/continue-client-config.yaml" && -f "$CONFIG_DIR/opencode-client-defaults.json" ]] \
     || die "configs/ not found beside the script (want $CONFIG_DIR) — copy the script AND the configs directory (see header)."
   server_up || die "server Ollama unreachable at http://$SERVER:11434 — check the server (phase 5) and --server."
-  if mcp_up; then
+  if mcp_up "$MCP_PORT"; then
     log "server RAG MCP reachable at http://$SERVER:$MCP_PORT/mcp."
   else
     warn "server RAG MCP NOT reachable at http://$SERVER:$MCP_PORT/mcp — retrieval tools will fail until the server runs it (plan section 9)."
+  fi
+  if mcp_up "$TOOLS_MCP_PORT"; then
+    log "server agent-tools MCP reachable at http://$SERVER:$TOOLS_MCP_PORT/mcp."
+  else
+    warn "server agent-tools MCP NOT reachable at http://$SERVER:$TOOLS_MCP_PORT/mcp — fetch/thinking tools need the host service (plan section 9)."
   fi
   command -v python3 >/dev/null 2>&1 || die "python3 not found — install it first."
   log "preflight OK (OS: $OS, server: $SERVER)."
@@ -93,7 +100,7 @@ write_continue_config() {
     cp -p "$cfg" "$cfg.bak.$(date +%Y%m%d-%H%M%S)"
     log "backed up existing $cfg."
   fi
-  sed "s/__SERVER__/$SERVER/g; s/__MCP_PORT__/$MCP_PORT/g" \
+  sed "s/__SERVER__/$SERVER/g; s/__MCP_PORT__/$MCP_PORT/g; s/__TOOLS_MCP_PORT__/$TOOLS_MCP_PORT/g" \
     "$CONFIG_DIR/continue-client-config.yaml" > "$cfg"
   log "wrote $cfg."
 }
@@ -112,17 +119,17 @@ install_opencode() {
 
 write_opencode_config() {
   local cfg="$HOME/.config/opencode/opencode.jsonc"
-  if [[ "$DRY_RUN" -eq 1 ]]; then log "[dry-run] would merge provider.ollama + mcp.rag into $cfg"; return 0; fi
+  if [[ "$DRY_RUN" -eq 1 ]]; then log "[dry-run] would merge provider.ollama + remote MCP servers into $cfg"; return 0; fi
   mkdir -p "$(dirname "$cfg")"
   if [[ -f "$cfg" ]]; then
     cp -p "$cfg" "$cfg.bak.$(date +%Y%m%d-%H%M%S)"
     log "backed up existing $cfg."
   fi
-  SERVER="$SERVER" MCP_PORT="$MCP_PORT" OPENCODE_CFG="$cfg" \
+  SERVER="$SERVER" MCP_PORT="$MCP_PORT" TOOLS_MCP_PORT="$TOOLS_MCP_PORT" OPENCODE_CFG="$cfg" \
     CLIENT_DEFAULTS="$CONFIG_DIR/opencode-client-defaults.json" python3 - <<'EOF'
 import json, os, urllib.request
-server, port, p = (os.environ["SERVER"], os.environ["MCP_PORT"],
-                   os.environ["OPENCODE_CFG"])
+server, port, tools_port, p = (os.environ["SERVER"], os.environ["MCP_PORT"],
+                               os.environ["TOOLS_MCP_PORT"], os.environ["OPENCODE_CFG"])
 defs = json.load(open(os.environ["CLIENT_DEFAULTS"]))
 with urllib.request.urlopen(f"http://{server}:11434/api/tags", timeout=15) as r:
     names = [m["name"] for m in json.load(r).get("models", [])]
@@ -162,8 +169,10 @@ provs["ollama"] = {
 }
 d.setdefault("mcp", {})[defs.get("mcp_name", "rag")] = {
     "type": "remote", "url": f"http://{server}:{port}/mcp"}
+d["mcp"][defs.get("agent_tools_mcp_name", "agent-tools")] = {
+  "type": "remote", "url": f"http://{server}:{tools_port}/mcp"}
 json.dump(d, open(p, "w"), indent=2)
-print(f"provider.ollama + mcp.rag written ({len(models)} models)")
+print(f"provider.ollama + remote MCP servers written ({len(models)} models)")
 EOF
   log "wrote $cfg."
 }
@@ -184,7 +193,8 @@ verify() {
   else
     warn "opencode: MISSING"; fail=1
   fi
-  mcp_up && log "RAG MCP: reachable" || warn "RAG MCP: unreachable (server-side, plan section 9)"
+  mcp_up "$MCP_PORT" && log "RAG MCP: reachable" || warn "RAG MCP: unreachable (server-side, plan section 9)"
+  mcp_up "$TOOLS_MCP_PORT" && log "agent-tools MCP: reachable" || warn "agent-tools MCP: unreachable (server-side, plan section 9)"
   if [[ "$fail" -eq 0 ]]; then
     log "client setup OK. Next: open VS Code, new Continue Agent session (Glimmer), or: opencode run -m ollama/muse-glimmer:30b-mlx \"...\""
   else
@@ -202,6 +212,11 @@ verify_retrieval() {
     log "opencode MCP: rag server listed."
   else
     warn "opencode MCP: rag server NOT listed."; fail=1
+  fi
+  if opencode mcp list 2>/dev/null | grep -qi 'agent-tools'; then
+    log "opencode MCP: agent-tools server listed."
+  else
+    warn "opencode MCP: agent-tools server NOT listed."; fail=1
   fi
   # 2. Functional probe: read-only scratch project (edit+bash denied, so a
   # grounded answer can only come through the rag MCP tools).
@@ -236,10 +251,11 @@ verify_retrieval() {
   # 3. Continue can only be checked statically here — the live half needs
   # the VS Code GUI, so print the exact manual step.
   local cfg="$HOME/.continue/config.yaml"
-  if grep -q 'mcpServers:' "$cfg" 2>/dev/null && grep -q "$SERVER:$MCP_PORT/mcp" "$cfg" 2>/dev/null; then
-    log "Continue config: remote rag MCP entry present."
+  if grep -q 'mcpServers:' "$cfg" 2>/dev/null && grep -q "$SERVER:$MCP_PORT/mcp" "$cfg" 2>/dev/null \
+      && grep -q "$SERVER:$TOOLS_MCP_PORT/mcp" "$cfg" 2>/dev/null; then
+    log "Continue config: remote rag and agent-tools MCP entries present."
   else
-    warn "Continue config: rag MCP entry MISSING."; fail=1
+    warn "Continue config: remote rag or agent-tools MCP entry MISSING."; fail=1
   fi
   log "Manual (VS Code GUI): new Continue Agent session (Muse Glimmer 30B), ask: \"Using the rag tools, query collection 'alice' for who is accused of stealing the tarts, and cite the source chunk.\" Pass = rag_query called, Knave of Hearts answered."
   [[ "$fail" -eq 0 ]] && log "retrieval verification: PASS." || warn "retrieval verification: INCOMPLETE."
@@ -251,6 +267,7 @@ main() {
     case "$1" in
       --server) SERVER="$2"; shift 2 ;;
       --mcp-port) MCP_PORT="$2"; shift 2 ;;
+      --tools-mcp-port) TOOLS_MCP_PORT="$2"; shift 2 ;;
       --dry-run) DRY_RUN=1; shift ;;
       --check-only) CHECK_ONLY=1; shift ;;
       -h|--help) usage; exit 0 ;;
