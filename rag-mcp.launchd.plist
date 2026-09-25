@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- org.local-intel.rag-mcp — serve rag_mcp.py over HTTP for LAN clients.
+       Template: __ROOT__ is the repo checkout. Install (your own Terminal):
+         sed "s|__ROOT__|/Users/you/local-intelligence|" rag-mcp.launchd.plist \
+           > ~/Library/LaunchAgents/org.local-intel.rag-mcp.plist
+         launchctl load -w ~/Library/LaunchAgents/org.local-intel.rag-mcp.plist
+         curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8011/mcp  # want 400
+       (bootstrap fails with error 5 here; legacy load works.)
+       Unload: launchctl unload ~/Library/LaunchAgents/org.local-intel.rag-mcp.plist
+       Trusted LAN only — no auth, same posture as the Ollama LAN bind. -->
+  <key>Label</key><string>org.local-intel.rag-mcp</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__ROOT__/.venv/bin/python</string>
+    <string>__ROOT__/rag_mcp.py</string>
+    <string>--transport</string><string>streamable-http</string>
+    <string>--host</string><string>0.0.0.0</string>
+    <string>--port</string><string>8011</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/tmp/rag-mcp.log</string>
+  <key>StandardErrorPath</key><string>/tmp/rag-mcp.log</string>
+</dict>
+</plist>

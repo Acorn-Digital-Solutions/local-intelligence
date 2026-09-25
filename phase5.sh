@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# phase5.sh — LAN access for local-intelligence-plan.md
+# phase5.sh — LAN access for plans/local-intelligence-plan.md
 # Binds Ollama to all interfaces (it ships localhost-only) so other machines
 # on the same local network can use it; confirms Open WebUI already publishes
 # :3000 on all interfaces. Persists via the brew services env file

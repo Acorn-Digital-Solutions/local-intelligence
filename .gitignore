@@ -1,0 +1,5 @@
+# eval harness output (./eval.sh) — results + raw per-run logs
+eval-results/
+eval-logs/
+eval-results-*.md
+__pycache__/

@@ -52,8 +52,9 @@ Files + terminal only goes so far; target "does the whole task".
 ## Step 4 — Align limits and residency (free performance)
 
 - opencode `limit.context` is 32768 while models serve 131K: raise the
-  default limit in `opencode-ollama-provider.json` (e.g. 65536+) and
-  regenerate the provider.
+  default limit in `configs/opencode-ollama-provider.json` and
+  `configs/opencode-client-defaults.json` (e.g. 65536+) and regenerate
+  the provider(s).
 - Keep-alive is 5 min; a 120B reload mid-task is slow. Raise
   `OLLAMA_KEEP_ALIVE` (e.g. 30m–24h to taste) and preload the working
   pair (Glimmer + embed/coder) so agent loops never cold-start.
@@ -80,6 +81,6 @@ Files + terminal only goes so far; target "does the whole task".
 ## Standing rules
 
 - Every change is scored with the Step 1 harness before adoption.
-- Docs follow code: `local-intelligence-plan.md`, `continue-config.yaml`,
+- Docs follow code: `local-intelligence-plan.md` (same dir), `../continue-config.yaml`,
   `AGENT_MODELS`/provider, and demo READMEs stay in sync (see the
   `add-ollama-model` skill for the model-change checklist).

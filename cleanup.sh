@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # cleanup.sh — uninstall existing local-intelligence software for a clean sheet
 # Target: Mac Pro M4 Ultra, 128GB unified RAM, macOS Apple Silicon
-# Covers everything named in local-intelligence-plan.md:
+# Covers everything named in plans/local-intelligence-plan.md:
 #   runtimes (Ollama, LM Studio, llama.cpp, MLX/mlx-lm, llamafile, GPT4All),
 #   models/caches, RAG services (Qdrant/Chroma), frontends (Open WebUI/LibreChat).
 # Safe by default: dry-run unless --yes is passed. Idempotent — missing items are skipped.
@@ -296,7 +296,7 @@ main() {
   if [[ "$DRY_RUN" -eq 1 ]]; then
     log "DRY RUN — nothing will be removed. Pass --yes to execute."
   else
-    log "LIVE RUN — removing software listed in local-intelligence-plan.md."
+    log "LIVE RUN — removing software listed in plans/local-intelligence-plan.md."
     ensure_sudo
   fi
 

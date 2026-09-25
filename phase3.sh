@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# phase3.sh — Phase 3 RAG services for local-intelligence-plan.md
+# phase3.sh — Phase 3 RAG services for plans/local-intelligence-plan.md
 # Starts Qdrant (pinned Docker image, persistent volume), installs the RAG
 # Python deps into the project .venv, ingests the plan docs, and verifies a
 # grounded retrieve loop. Idempotent — safe to re-run.

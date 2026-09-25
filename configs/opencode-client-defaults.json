@@ -1,0 +1,15 @@
+{
+  "$comment": "Client opencode defaults, read by client-setup.sh. Single source for model preference order, display suffixes, limits, and skip rules — edit here, never in the script.",
+  "model_order": ["qwen3-coder:30b", "gpt-oss:120b", "muse-glimmer:30b-mlx"],
+  "small_model": "qwen2.5-coder:1.5b",
+  "provider_name": "Ollama (server)",
+  "npm": "@ai-sdk/openai-compatible",
+  "model_name_suffix": " (remote)",
+  "agentic_name_suffix": " (remote, agentic)",
+  "default_limit": {
+    "context": 32768,
+    "output": 8192
+  },
+  "skip_substrings": ["embed", "bge-m3", "mxbai"],
+  "mcp_name": "rag"
+}

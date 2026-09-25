@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# phase4.sh — Phase 4 chat UI with RAG for local-intelligence-plan.md
+# phase4.sh — Phase 4 chat UI with RAG for plans/local-intelligence-plan.md
 # Runs Open WebUI (pinned image) wired to Ollama for chat + embeddings,
 # creates the admin user, and verifies a grounded RAG answer end to end.
 # Also ensures the OpenCode terminal agent binary (provider wiring for the
@@ -172,15 +172,15 @@ ensure_opencode() {
     return 0
   fi
   if [[ "$DRY_RUN" -eq 1 ]]; then
-    log "[dry-run] would merge opencode-ollama-provider.json into $OPENCODE_CFG"
+    log "[dry-run] would merge provider.ollama into $OPENCODE_CFG"
     return 0
   fi
-  # Merge (never clobber): provider definition comes from the sidecar file
-  # opencode-ollama-provider.json; the models block is built from
-  # `ollama list` so the picker shows every chat model. Embedding-only
-  # models can't chat and are skipped; every proven agentic model is
-  # flagged tool_call (the 32Bs narrate calls as text).
-  local template="$ROOT_DIR/opencode-ollama-provider.json"
+  # Merge (never clobber): provider definition comes from the template in
+  # configs/; the models block is built from `ollama list` so the picker
+  # shows every chat model. Embedding-only models can't chat and are
+  # skipped; every proven agentic model is flagged tool_call (the 32Bs
+  # narrate calls as text).
+  local template="$ROOT_DIR/configs/opencode-ollama-provider.json"
   [[ -f "$template" ]] || { warn "provider template missing: $template"; return 1; }
   AGENT_MODELS="$AGENT_MODELS" OPENCODE_CFG="$OPENCODE_CFG" \
     PROVIDER_TEMPLATE="$template" "$VENV_PY" - <<'EOF'
@@ -267,7 +267,7 @@ verify() {
   # End-to-end RAG: upload plan -> temp collection -> grounded chat -> cleanup.
   local fid kid answer
   fid="$(curl -s --max-time 60 -X POST "$WEBUI_URL/api/v1/files/" -H "Authorization: Bearer $token" \
-    -F "file=@$ROOT_DIR/local-intelligence-plan.md" \
+    -F "file=@$ROOT_DIR/plans/local-intelligence-plan.md" \
     | "$VENV_PY" -c "import json,sys; print(json.load(sys.stdin).get('id',''))" 2>/dev/null)"
   kid="$(curl -s --max-time 15 -X POST "$WEBUI_URL/api/v1/knowledge/create" -H "Authorization: Bearer $token" \
     -H 'Content-Type: application/json' -d '{"name":"phase4-probe","description":"automated verify, deleted after"}' \

@@ -37,7 +37,7 @@ Run in order on a fresh machine; later phases require earlier ones:
    plus `--skip-70b` for phase2, `--recreate` for phase3).
 3. Multiple phases run left to right:
    `./local-intelligence-setup.sh --phase1 --phase2`
-4. Confirm with the plan's manual checks (`local-intelligence-plan.md`
+4. Confirm with the plan's manual checks (`plans/local-intelligence-plan.md`
    section 5), e.g. `curl -s localhost:11434/api/version`,
    `ollama list`, `curl -s localhost:6333/collections`.
 
