@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # local-intelligence-setup.sh — automate local-intelligence-plan.md
 # Target: Mac Pro M4 Ultra, 128GB unified RAM, macOS Apple Silicon
-# Step-by-step build: Phase 1 (base runtimes) -> Phase 2 (models) -> Phase 3 (RAG) -> Phase 4 (chat UI).
+# Step-by-step build: Phase 1 (base runtimes) -> Phase 2 (models) -> Phase 3 (RAG) -> Phase 4 (chat UI) -> Phase 5 (LAN access).
 # Optimize lives outside setup: ./benchmark.sh (standalone).
 set -euo pipefail
 
@@ -24,6 +24,8 @@ Options:
             Extra flags forwarded to phase3.sh: --dry-run --check-only --recreate
   --phase4    Chat UI with RAG (Open WebUI + OpenCode)
             Extra flags forwarded to phase4.sh: --dry-run --check-only
+  --phase5    LAN access (Ollama + WebUI on local network)
+            Extra flags forwarded to phase5.sh: --dry-run --check-only
   -h, --help  Show this help
 EOF
 }
@@ -73,6 +75,17 @@ phase4() {
   log "Phase 4: chat UI with RAG (Open WebUI + OpenCode)"
   if ((${#fwd[@]})); then "$ROOT_DIR/phase4.sh" "${fwd[@]}"; else "$ROOT_DIR/phase4.sh"; fi
 }
+phase5() {
+  local fwd=()
+  local a
+  for a in "$@"; do
+    case "$a" in
+      --dry-run|--check-only) fwd+=("$a") ;;
+    esac
+  done
+  log "Phase 5: LAN access (Ollama + WebUI on local network)"
+  if ((${#fwd[@]})); then "$ROOT_DIR/phase5.sh" "${fwd[@]}"; else "$ROOT_DIR/phase5.sh"; fi
+}
 
 main() {
   [[ -f "$PLAN_FILE" ]] || die "plan file not found: $PLAN_FILE"
@@ -83,6 +96,7 @@ main() {
       --phase2) phase2 "$@" ;;
       --phase3) phase3 "$@" ;;
       --phase4) phase4 "$@" ;;
+      --phase5) phase5 "$@" ;;
 
       -h|--help) usage; exit 0 ;;
       *) die "unknown arg: $arg (try --help)" ;;

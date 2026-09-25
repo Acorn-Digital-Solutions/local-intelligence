@@ -1,0 +1,13 @@
+{
+  // local-intelligence workspace settings. Applied automatically when this
+  // folder is open in VS Code (no import step). Only needed then: it makes
+  // Run/Debug use the project .venv instead of the system Python.
+  // Someone using the AI from another machine skips this file (plan §8,
+  // path B). The AI assistant wiring is
+  // NOT here: Continue reads only ~/.continue/config.yaml, so model setup
+  // lives in continue-config.yaml at the repo root (copy it per plan §8).
+  // Python side: run everything (rag_demo.py, scripts) in the project venv,
+  // auto-activated in new integrated terminals.
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.terminal.activateEnvironment": true
+}

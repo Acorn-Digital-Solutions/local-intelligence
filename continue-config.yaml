@@ -1,0 +1,50 @@
+# continue-config.yaml — Continue extension config for the local stack.
+# Copy to ~/.continue/config.yaml (see plan §8); Continue reloads it on save.
+# Model names must match `ollama list` exactly. All roles run against the
+# local Ollama server — no cloud traffic. Schema: https://docs.continue.dev/reference
+# From another LAN machine, replace 127.0.0.1 with compute.local (plan §8, path B).
+name: Local Config
+version: 0.0.1
+schema: v1
+models:
+  # Coding Q&A + inline edits (Cmd+I): proven chat model, no tool use.
+  - name: Qwen2.5-Coder 32B
+    provider: ollama
+    model: qwen2.5-coder:32b
+    apiBase: http://127.0.0.1:11434
+    roles:
+      - chat
+      - edit
+      - apply
+  # Agent mode: the only local model proven to emit real tool_calls (§4).
+  - name: Qwen3-Coder 30B (agentic)
+    provider: ollama
+    model: qwen3-coder:30b
+    apiBase: http://127.0.0.1:11434
+    roles:
+      - chat
+    capabilities:
+      - tool_use
+  # Step-by-step reasoning when stuck (verbose, chat only).
+  - name: DeepSeek R1 32B (reasoning)
+    provider: ollama
+    model: deepseek-r1:32b
+    apiBase: http://127.0.0.1:11434
+    roles:
+      - chat
+  # Codebase indexing (@codebase): same local embeddings as the RAG stack.
+  - name: Nomic Embed Text
+    provider: ollama
+    model: nomic-embed-text
+    apiBase: http://127.0.0.1:11434
+    roles:
+      - embed
+  # Tab autocomplete is deliberately NOT configured: it needs a small,
+  # fast model and only 30B+ models are installed (seconds per suggestion).
+  # To enable: `ollama pull qwen2.5-coder:1.5b`, then add:
+  # - name: Qwen2.5-Coder 1.5B
+  #   provider: ollama
+  #   model: qwen2.5-coder:1.5b
+  #   apiBase: http://127.0.0.1:11434
+  #   roles:
+  #     - autocomplete

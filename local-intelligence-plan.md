@@ -95,13 +95,27 @@ Phase 4 — chat UI with RAG (the friendly front door):
   plan-specific embedding name in the answer), and a non-interactive
   `opencode run` edits a scratch file using only the local model
 
-Phase 5 — optimize, standalone (was Phase 4; NOT part of setup):
-- `./benchmark.sh` (own script, own flags): fixed-prompt MLX vs GGUF
-  shootout, same model class, tokens/sec + wall time + per-prompt verdict,
-  results to timestamped `benchmark-results-*.md`. Not wired into setup.
-- Reserve Q8 only for <=32B
-- Use Qwen3-30B-A3B MoE if MoE needed
-- Cap context by KV RAM
+Phase 5 — LAN access (`phase5.sh`):
+- Binds Ollama to all interfaces (`OLLAMA_HOST=0.0.0.0`, persisted in the
+  brew services plist; ships localhost-only, WebUI already publishes `:3000`)
+- Machine name `compute` (`compute.local` via Bonjour/mDNS — tracks DHCP IP
+  changes, no DNS server needed). Set once:
+  `scutil --set ComputerName/LocalHostName/HostName`
+- Verify: `http://compute.local:11434` + `:3000` reachable from other LAN machines
+- From elsewhere: Ollama API at `compute.local:11434` (`/v1` for
+  OpenAI-compat, e.g. opencode provider `baseURL`), WebUI login at
+  `compute.local:3000` (fall back to the DHCP IP if a client lacks mDNS)
+- SECURITY: Ollama has no login — anyone on the LAN can use AND administer
+  models. Trusted home LAN only; allow Ollama/Docker in the macOS firewall
+  prompt when it appears.
+- Unattended (`power-settings.sh`, run with sudo): `sleep 0` so services
+  survive idle, `displaysleep 10` + `disksleep 10` so idle stays cheap,
+  `autorestart 1` to recover from power cuts. Pair with a screen lock
+  (System Settings > Lock Screen) and Docker Desktop > Start at login.
+
+Standalone (not a phase): `./benchmark.sh` — fixed-prompt MLX vs GGUF
+shootout with per-prompt verdicts. Also: reserve Q8 for <=32B, Qwen3-30B-A3B
+MoE if a fast generalist is needed, cap context by KV RAM.
 
 ## 5. Manual testing — how to try it
 
@@ -201,10 +215,76 @@ Phase 4 — chat UI with RAG (provisional; applies once `phase4.sh` lands):
   scratch dir — file gets edited with no cloud traffic (config + smoke test
   in `phase4.sh`; project-local `opencode.json` can pre-allow edits)
 
-Phase 5 — optimize (`./benchmark.sh`, standalone):
+Phase 5 — LAN access:
+- Try it: from another machine on the same Wi-Fi, open `http://compute.local:3000`
+- API check: `curl http://compute.local:11434/api/version`
+- Fallback if a client can't do mDNS: use the DHCP IP (`ipconfig getifaddr en0`)
+
+Standalone benchmark (`./benchmark.sh`, not a phase):
 - Try it: `./benchmark.sh --quick` (1 prompt, 64 tokens) then full `./benchmark.sh`
 - Results land in `benchmark-results-<date>.md` with per-prompt winners
 - Contenders via env: `OLLAMA_MODEL=... MLX_MODEL=... ./benchmark.sh`
 - Context sizing: `ollama ps` CONTEXT column vs the model's trained
   context (`ollama show <model>`); if answers degrade past some length,
   the KV-cache (not the advertised max) is the practical cap
+
+## 8. Using local models in VSCode (Continue)
+
+Two files, two homes — this split is forced by the tools, not a choice:
+`.vscode/settings.json` is read automatically by VS Code per open folder
+(Python interpreter + terminal env), while Continue reads its models only
+from `~/.continue/config.yaml` and ignores `settings.json` for them. The
+repo template is `continue-config.yaml` at the repo root.
+
+Path A — on this Mac, working in this repo
+(prerequisite: `brew services start ollama`):
+
+1. Install the assistant: in VS Code, Extensions view (`Cmd+Shift+X`) →
+   search "Continue" → Install (publisher Continue, id
+   `Continue.continue`). The Continue logo appears in the sidebar.
+2. Open this repo as the workspace: File → Open Folder →
+   `~/local-intelligence`. `.vscode/settings.json` applies by itself —
+   nothing to import. Why it exists: without it VS Code runs Python with
+   the system interpreter and `rag_demo.py` fails on missing deps; with
+   it, Run/Debug uses the project `.venv`. Confirm: status bar shows
+   `.venv`, and a new integrated terminal (`Ctrl+`` `) has the venv
+   activated (`which python` → `.venv/bin/python`).
+3. Install the model config (one copy, user-wide — it then serves every
+   project, not just this repo):
+   `mkdir -p ~/.continue && cp continue-config.yaml ~/.continue/config.yaml`
+   Continue reloads it on save, no restart needed. If Continue already
+   created a `config.yaml`, merge the `models:` block instead of
+   overwriting. Model names must match `ollama list` exactly.
+4. Use it: `Cmd+L` chat (model switcher: `Qwen2.5-Coder 32B` for coding
+   Q&A, `Qwen3-Coder 30B` for Agent mode with tools, `DeepSeek R1 32B`
+   for step-by-step reasoning), `Cmd+I` inline edit, `@codebase` to ask
+   over the indexed workspace (embedded locally by `nomic-embed-text`,
+   the same model as the Phase 3 RAG stack). Indexing runs on first use.
+
+Path B — from another computer on the LAN, no repo needed
+(prerequisites: Phase 5 done so Ollama is LAN-bound, server running):
+
+1. Install Continue in that machine's VS Code (same as step A1).
+2. Copy the model config there with one change: every `apiBase` becomes
+   `http://compute.local:11434` instead of `http://127.0.0.1:11434`
+   (fall back to the Mac's DHCP IP, e.g. `http://192.168.0.101:11434`,
+   if the client lacks mDNS). Save as `~/.continue/config.yaml`
+   (macOS/Linux) or `%USERPROFILE%\.continue\config.yaml` (Windows).
+   The repo's `.vscode/settings.json` is irrelevant here — it only
+   matters when this folder itself is open.
+3. Same usage as step A4. The first chat wakes/loads the model on the
+   Mac, so expect a slower first answer; `ollama ps` on the Mac shows it.
+
+Optional tab autocomplete (both paths): needs a small model the phases
+don't install — on the Mac, `ollama pull qwen2.5-coder:1.5b`, then
+uncomment the autocomplete block at the bottom of the active
+`config.yaml` (adjusting `apiBase` for path B). The installed 30B+
+models are seconds per suggestion — unusable here.
+
+Verify: with Ollama up, Continue chat answers using the selected local
+model. If Continue reports a connection error, re-check the server from
+the client machine first (`curl http://compute.local:11434/api/version`
+for path B, `curl -s 127.0.0.1:11434/api/version` on the Mac) — Continue
+can't reach a stopped server. No account, no API key, no cloud traffic
+on either path; path B inherits the Phase 5 caveat (trusted LAN only —
+Ollama has no login).
