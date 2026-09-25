@@ -33,6 +33,10 @@ Q5_K_M / Q6_K / Q8_0 only +1-3 pts for +20-60% memory. Reserve Q8 for <=32B. IQ 
 
 Consensus picks 2025-2026:
 - General + coding: Qwen3 / Qwen2.5-Coder-32B, Qwen3-Coder-30B-A3B
+- Agentic default: Muse Glimmer 30B (`muse-glimmer:30b-mlx` via Ollama's
+  MLX engine, 128K, vision+tools+thinking) — purpose-built for tool use
+  and failure recovery. Heavyweight: `gpt-oss:120b` (~65GB) for the
+  hardest reasoning/agentic work; both fit 128GB with KV headroom
 - Reasoning: DeepSeek R1/V3 + R1-Distill-Qwen-32B (best step-by-step, slower/verbose)
 - Safe fallback: Llama 3.3 70B Q4
 - Efficient 20-32B: Gemma 3 27B, Mistral Small 3.1 24B, Phi-4, Devstral 24B
@@ -85,11 +89,14 @@ Phase 4 — chat UI with RAG (the friendly front door):
     `~/.config/opencode/opencode.jsonc` under `provider.ollama` (other keys
     never clobbered; schema taken from `https://opencode.ai/config.json`).
     It declares every Ollama chat model (embedding-only excluded);
-    `qwen3-coder:30b` auto-pulled (~18GB) as the agentic model. Usage: plan §7.
+    every `AGENT_MODELS` entry auto-pulled and flagged `tool_call`
+    (`muse-glimmer:30b-mlx`, `gpt-oss:120b`, `qwen3-coder:30b`).
+    Usage: plan §7.
   - Model caveat, proven live: `qwen2.5-coder:32b` and `deepseek-r1:32b`
     narrate tool calls as text (`tool_calls: null` via `:11434/v1`), so they
-    cannot drive the agent loop — chat/generation only. `qwen3-coder:30b`
-    emits real structured `tool_calls`.
+    cannot drive the agent loop — chat/generation only. `qwen3-coder:30b`,
+    `muse-glimmer:30b-mlx` and `gpt-oss:120b` emit real structured
+    `tool_calls` with correct argument schemas.
 - Verify: model dropdown lists Phase 2 models, a doc-grounded question
   answers from the uploaded collection (automated probe asserts a
   plan-specific embedding name in the answer), and a non-interactive
@@ -195,11 +202,13 @@ local models are always chosen explicitly, so nothing reaches the cloud.
 
 - Interactive: `cd ~/code/myproj && opencode` → TUI, pick an `ollama/*`
   model in the picker, approve each edit as it asks.
-- One-shot: `opencode run -m ollama/qwen3-coder:30b "add retry logic to fetch.py"`
+- One-shot: `opencode run -m ollama/muse-glimmer:30b-mlx "add retry logic to fetch.py"`
   (`--dir` to target another directory without cd-ing).
-- Which model: `qwen3-coder:30b` for agentic edits (the only local model
-  proven to invoke tools); `qwen2.5-coder:32b` for coding Q&A in chat;
-  `deepseek-r1:32b` for step-by-step reasoning (verbose, no tool use).
+- Which model: `muse-glimmer:30b-mlx` for agentic edits (fast, agent-tuned,
+  MLX-accelerated); `gpt-oss:120b` when reasoning quality matters more
+  than speed; `qwen3-coder:30b` as backup (all three proven to invoke
+  tools); `qwen2.5-coder:32b` for coding Q&A in chat; `deepseek-r1:32b`
+  for step-by-step reasoning (verbose, no tool use).
 - Permissions: edits/shell prompt by default; `--auto` approves everything
   (dangerous — avoid). For unattended runs, a project-local `opencode.json`
   pre-allows scoped rights, e.g. `{"permission":{"edit":"allow","bash":"deny"}}`.
@@ -211,7 +220,7 @@ Phase 4 — chat UI with RAG (provisional; applies once `phase4.sh` lands):
 - Try it: Workspace → Knowledge → new Collection → upload this plan file,
   then chat "which embedding model does the plan use?" → grounded answer
 - `docker ps` shows `open-webui` healthy; data survives `docker restart open-webui`
-- Terminal agent: `opencode run -m ollama/qwen3-coder:30b "<task>"` in a
+- Terminal agent: `opencode run -m ollama/muse-glimmer:30b-mlx "<task>"` in a
   scratch dir — file gets edited with no cloud traffic (config + smoke test
   in `phase4.sh`; project-local `opencode.json` can pre-allow edits)
 
@@ -255,9 +264,10 @@ Path A — on this Mac, working in this repo
    Continue reloads it on save, no restart needed. If Continue already
    created a `config.yaml`, merge the `models:` block instead of
    overwriting. Model names must match `ollama list` exactly.
-4. Use it: `Cmd+L` chat (model switcher: `Qwen2.5-Coder 32B` for coding
-   Q&A, `Qwen3-Coder 30B` for Agent mode with tools, `DeepSeek R1 32B`
-   for step-by-step reasoning), `Cmd+I` inline edit, `@codebase` to ask
+4. Use it: `Cmd+L` chat (model switcher: `Muse Glimmer 30B` for Agent
+   mode with tools, `GPT-OSS 120B` for heavyweight agentic work,
+   `Qwen2.5-Coder 32B` for coding Q&A, `DeepSeek R1 32B` for
+   step-by-step reasoning), `Cmd+I` inline edit, `@codebase` to ask
    over the indexed workspace (embedded locally by `nomic-embed-text`,
    the same model as the Phase 3 RAG stack). Indexing runs on first use.
 
@@ -290,9 +300,11 @@ on either path; path B inherits the Phase 5 caveat (trusted LAN only —
 Ollama has no login).
 
 Agent-mode notes (verified live against Continue 2.0.0):
-- Model: use `Qwen3-Coder 30B (agentic)` for the whole session (it's the
-  picker default — first `chat` model in `config.yaml`). Qwen2.5-Coder
-  narrates tool calls as plain-text JSON and never executes them.
+- Model: use `Muse Glimmer 30B (agentic)` for the whole session (it's
+  the picker default — first `chat` model in `config.yaml`),
+  `GPT-OSS 120B` for harder tasks, `Qwen3-Coder 30B` as backup.
+  Qwen2.5-Coder narrates tool calls as plain-text JSON and never
+  executes them.
 - The config's `rules:` block pins exact tool names/arguments
   (`read_file(filepath)`, `run_terminal_command(command)`, …) because
   Qwen3-30B otherwise invents near-misses (`file_read`, `filePath`)

@@ -6,7 +6,7 @@ No code to write — the deliverable is a Markdown file. Needs the internet.
 Try it (from this directory):
 
 ```bash
-opencode run -m ollama/qwen3-coder:30b "complete the TASK in TASK.md"
+opencode run -m ollama/muse-glimmer:30b-mlx "complete the TASK in TASK.md"
 # or manually: curl the three URLs, write answers.md, then:
 python3 check.py
 ```

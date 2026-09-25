@@ -126,9 +126,11 @@ webui_token() {
 }
 
 OPENCODE_CFG="$HOME/.config/opencode/opencode.jsonc"
-# Agentic-capable local model (tool_calls proven via :11434/v1; the 32B
-# chat/coder + r1-distill narrate tool calls as text instead of invoking them).
-AGENT_MODEL="qwen3-coder:30b"
+# Agentic-capable local models (tool_calls proven via :11434/v1; the 32B
+# chat/coder + r1-distill narrate tool calls as text instead of invoking
+# them). First entry is the default for one-shot runs and smoke tests.
+AGENT_MODELS="muse-glimmer:30b-mlx gpt-oss:120b qwen3-coder:30b"
+AGENT_MODEL="$(echo "$AGENT_MODELS" | awk '{print $1}')"
 
 ensure_opencode() {
   if ! command -v opencode >/dev/null 2>&1; then
@@ -149,18 +151,20 @@ ensure_opencode() {
     fi
   fi
   log "opencode present: $(opencode --version 2>/dev/null || echo unknown)"
-  if ! ollama show "$AGENT_MODEL" >/dev/null 2>&1; then
+  local m
+  for m in $AGENT_MODELS; do
+    if ollama show "$m" >/dev/null 2>&1; then continue; fi
     if [[ "$CHECK_ONLY" -eq 1 ]]; then
-      warn "agentic model $AGENT_MODEL MISSING (check-only; would pull ~18GB)."
+      warn "agentic model $m MISSING (check-only; would pull it)."
       return 1
     fi
     if [[ "$DRY_RUN" -eq 1 ]]; then
-      log "[dry-run] would run: ollama pull $AGENT_MODEL (~18GB)"
+      log "[dry-run] would run: ollama pull $m"
       return 0
     fi
-    log "Pulling agentic model $AGENT_MODEL (~18GB, plan-listed MoE pick)..."
-    ollama pull "$AGENT_MODEL" || { warn "FAILED to pull $AGENT_MODEL."; return 1; }
-  fi
+    log "Pulling agentic model $m..."
+    ollama pull "$m" || { warn "FAILED to pull $m."; return 1; }
+  done
   if [[ "$CHECK_ONLY" -eq 1 ]]; then
     log "check-only: skipping config write."
     command -v opencode >/dev/null 2>&1 && opencode models ollama 2>/dev/null | grep -q "$AGENT_MODEL" \
@@ -174,15 +178,15 @@ ensure_opencode() {
   # Merge (never clobber): provider definition comes from the sidecar file
   # opencode-ollama-provider.json; the models block is built from
   # `ollama list` so the picker shows every chat model. Embedding-only
-  # models can't chat and are skipped; only the proven agentic model is
+  # models can't chat and are skipped; every proven agentic model is
   # flagged tool_call (the 32Bs narrate calls as text).
   local template="$ROOT_DIR/opencode-ollama-provider.json"
   [[ -f "$template" ]] || { warn "provider template missing: $template"; return 1; }
-  AGENT_MODEL="$AGENT_MODEL" OPENCODE_CFG="$OPENCODE_CFG" \
+  AGENT_MODELS="$AGENT_MODELS" OPENCODE_CFG="$OPENCODE_CFG" \
     PROVIDER_TEMPLATE="$template" "$VENV_PY" - <<'EOF'
 import json, os, subprocess
 p = os.environ["OPENCODE_CFG"]
-agent = os.environ["AGENT_MODEL"]
+agents = set(os.environ["AGENT_MODELS"].split())
 tpl = json.load(open(os.environ["PROVIDER_TEMPLATE"]))
 out = subprocess.run(["ollama", "list"], capture_output=True, text=True)
 names = [l.split()[0] for l in out.stdout.splitlines()[1:] if l.split()]
@@ -191,7 +195,7 @@ for m in names:
     if any(s in m for s in tpl.get("skip_substrings", [])):
         print(f"skipping embedding-only model: {m}")
         continue
-    agentic = (m == agent)
+    agentic = (m in agents)
     models[m] = {
         "name": m + (tpl["agentic_name_suffix"] if agentic else tpl["model_name_suffix"]),
         "tool_call": agentic,

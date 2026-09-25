@@ -1,5 +1,5 @@
 {
-  "$comment": "Ollama provider template for OpenCode (local models only). Merged by phase4.sh into ~/.config/opencode/opencode.jsonc under provider.ollama — your other keys are never touched. The models block is built dynamically from `ollama list` (embedding-only models skipped, AGENT_MODEL flagged tool_call); everything a human would tweak lives here.",
+  "$comment": "Ollama provider template for OpenCode (local models only). Merged by phase4.sh into ~/.config/opencode/opencode.jsonc under provider.ollama — your other keys are never touched. The models block is built dynamically from `ollama list` (embedding-only models skipped, every AGENT_MODELS entry flagged tool_call); everything a human would tweak lives here.",
   "npm": "@ai-sdk/openai-compatible",
   "name": "Ollama (local)",
   "options": {

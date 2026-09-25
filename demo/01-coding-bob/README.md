@@ -12,7 +12,7 @@ way!" to silence, "Whatever." to anything else.
 Try it (from this directory):
 
 ```bash
-opencode run -m ollama/qwen3-coder:30b "implement bob.py so all tests pass"
+opencode run -m ollama/muse-glimmer:30b-mlx "implement bob.py so all tests pass"
 ../../.venv/bin/python -m pytest bob_test.py -q
 ```
 

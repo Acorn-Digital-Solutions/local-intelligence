@@ -7,9 +7,31 @@ name: Local Config
 version: 0.0.1
 schema: v1
 models:
-  # Agent mode default (first chat model = picker default): the only local
-  # model proven to emit real tool_calls (plan section 4). Qwen2.5 narrates
-  # tool calls as text and must NOT be used in Agent mode.
+  # Agent mode default (first chat model = picker default): Meta's 30B
+  # agent-tuned model, MLX-accelerated on Apple Silicon. Real tool_calls
+  # proven via :11434/v1; also takes image input (vision).
+  - name: Muse Glimmer 30B (agentic)
+    provider: ollama
+    model: muse-glimmer:30b-mlx
+    apiBase: http://127.0.0.1:11434
+    roles:
+      - chat
+    capabilities:
+      - tool_use
+      - image_input
+  # Heavyweight agent: OpenAI's 120B open-weights model (~65GB). Slower
+  # but strongest reasoning + tool calling; proven via :11434/v1.
+  - name: GPT-OSS 120B (heavyweight)
+    provider: ollama
+    model: gpt-oss:120b
+    apiBase: http://127.0.0.1:11434
+    roles:
+      - chat
+    capabilities:
+      - tool_use
+  # Agentic backup: proven real tool_calls, kept for when the models
+  # above are unloaded. Qwen2.5 narrates tool calls as text and must NOT
+  # be used in Agent mode.
   - name: Qwen3-Coder 30B (agentic)
     provider: ollama
     model: qwen3-coder:30b
