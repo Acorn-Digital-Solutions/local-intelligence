@@ -7,6 +7,17 @@ name: Local Config
 version: 0.0.1
 schema: v1
 models:
+  # Agent mode default (first chat model = picker default): the only local
+  # model proven to emit real tool_calls (plan section 4). Qwen2.5 narrates
+  # tool calls as text and must NOT be used in Agent mode.
+  - name: Qwen3-Coder 30B (agentic)
+    provider: ollama
+    model: qwen3-coder:30b
+    apiBase: http://127.0.0.1:11434
+    roles:
+      - chat
+    capabilities:
+      - tool_use
   # Coding Q&A + inline edits (Cmd+I): proven chat model, no tool use.
   - name: Qwen2.5-Coder 32B
     provider: ollama
@@ -16,15 +27,6 @@ models:
       - chat
       - edit
       - apply
-  # Agent mode: the only local model proven to emit real tool_calls (§4).
-  - name: Qwen3-Coder 30B (agentic)
-    provider: ollama
-    model: qwen3-coder:30b
-    apiBase: http://127.0.0.1:11434
-    roles:
-      - chat
-    capabilities:
-      - tool_use
   # Step-by-step reasoning when stuck (verbose, chat only).
   - name: DeepSeek R1 32B (reasoning)
     provider: ollama
@@ -48,3 +50,8 @@ models:
   #   apiBase: http://127.0.0.1:11434
   #   roles:
   #     - autocomplete
+rules:
+  # Qwen3-30B invents near-miss tool/argument names that Continue rejects
+  # ("Tool ... not found", "Cannot read properties of undefined"). Exact
+  # built-in tool names + arguments in Continue 2.0.0 (verified in bundle):
+  - "Agent tools - exact names and arguments only: read_file(filepath), read_file_range(filepath, startLine, endLine), create_new_file(filepath, contents), grep_search(query), file_glob_search(pattern), ls(dirPath), run_terminal_command(command), fetch_url_content(url), search_web(query). Lowercase filepath/contents/query - never filePath, fileContent, or pattern for grep. Never invent variants like file_read, run_terminal, run_shell_command, or fetch_url."

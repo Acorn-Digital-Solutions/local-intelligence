@@ -288,3 +288,20 @@ for path B, `curl -s 127.0.0.1:11434/api/version` on the Mac) — Continue
 can't reach a stopped server. No account, no API key, no cloud traffic
 on either path; path B inherits the Phase 5 caveat (trusted LAN only —
 Ollama has no login).
+
+Agent-mode notes (verified live against Continue 2.0.0):
+- Model: use `Qwen3-Coder 30B (agentic)` for the whole session (it's the
+  picker default — first `chat` model in `config.yaml`). Qwen2.5-Coder
+  narrates tool calls as plain-text JSON and never executes them.
+- The config's `rules:` block pins exact tool names/arguments
+  (`read_file(filepath)`, `run_terminal_command(command)`, …) because
+  Qwen3-30B otherwise invents near-misses (`file_read`, `filePath`)
+  that fail with "Tool … not found". A red crossed-out "Agent tool use"
+  entry means a tool call failed this way — check the name/args.
+- Approval is per call: writes and terminal commands always prompt
+  (no session-wide accept exists in 2.0.0); `Cmd+Enter` accepts each
+  prompt. Reads (`read_file`, glob, grep, `ls`) run without prompts.
+- Reliability: `@`-mention files (`@demo/01-coding-bob/bob_test.py`)
+  instead of relying on the read tool; start a fresh session after
+  config changes (old sessions keep their original model). For
+  unattended runs prefer opencode (§7) over Continue Agent.
