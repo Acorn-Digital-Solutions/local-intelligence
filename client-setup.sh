@@ -2,10 +2,11 @@
 # client-setup.sh — set up a CLIENT machine against a local-intelligence server.
 # Self-contained: needs only this file (no repo checkout). Supports macOS
 # (needs Homebrew) and Linux (apt- or dnf-based). Windows: use WSL2, then
-# follow the Linux path.
+# follow the Linux path. Requires VS Code already installed (with the
+# `code` CLI on PATH) — the script does not install it.
 #
 # Installs + configures, all pointed at the server:
-#   - VS Code + Continue extension + ~/.continue/config.yaml
+#   - Continue extension + ~/.continue/config.yaml
 #     (models via http://SERVER:11434, RAG via http://SERVER:8011/mcp)
 #   - opencode + ~/.config/opencode/opencode.jsonc (same server wiring)
 #
@@ -65,41 +66,11 @@ preflight() {
   log "preflight OK (OS: $OS, server: $SERVER)."
 }
 
-install_vscode() {
-  if command -v code >/dev/null 2>&1; then log "VS Code present."; return 0; fi
-  if [[ "$DRY_RUN" -eq 1 ]]; then log "[dry-run] would install VS Code ($OS)"; return 0; fi
-  case "$OS" in
-    macos)
-      command -v brew >/dev/null 2>&1 || die "Homebrew required: install from https://brew.sh first."
-      brew install --cask visual-studio-code
-      if ! command -v code >/dev/null 2>&1; then
-        local shim="/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
-        if [[ -x "$shim" && -w /usr/local/bin ]]; then
-          ln -sf "$shim" /usr/local/bin/code
-        else
-          warn "'code' not on PATH — in VS Code run Cmd+Shift+P > 'Shell Command: Install code command in PATH', then re-run."
-          return 1
-        fi
-      fi ;;
-    linux-apt)
-      sudo apt-get install -y wget gpg apt-transport-https
-      wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg
-      sudo install -D -o root -g root -m 644 packages.microsoft.gpg /etc/apt/keyrings/packages.microsoft.gpg
-      echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" \
-        | sudo tee /etc/apt/sources.list.d/vscode.list >/dev/null
-      rm -f packages.microsoft.gpg
-      sudo apt-get update && sudo apt-get install -y code ;;
-    linux-dnf)
-      sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
-      printf '[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc\n' \
-        | sudo tee /etc/yum.repos.d/vscode.repo >/dev/null
-      sudo dnf install -y code ;;
-  esac
-  command -v code >/dev/null 2>&1 || die "VS Code install did not yield a 'code' binary."
-  log "VS Code installed."
-}
-
 install_continue() {
+  if ! command -v code >/dev/null 2>&1; then
+    warn "VS Code ('code') not found — install VS Code first, then re-run for the Continue extension."
+    return 1
+  fi
   if code --list-extensions 2>/dev/null | grep -qi '^Continue\.continue'; then
     log "Continue extension present."
   else
@@ -267,6 +238,59 @@ verify() {
   return "$fail"
 }
 
+# Live retrieval verification (normal runs only; skipped under --check-only
+# because it takes minutes against the server models).
+verify_retrieval() {
+  local fail=0
+  # 1. opencode must show the rag server connected.
+  if opencode mcp list 2>/dev/null | grep -qi 'rag'; then
+    log "opencode MCP: rag server listed."
+  else
+    warn "opencode MCP: rag server NOT listed."; fail=1
+  fi
+  # 2. Functional probe: read-only scratch project (edit+bash denied, so a
+  # grounded answer can only come through the rag MCP tools).
+  if opencode models ollama 2>/dev/null | grep -q "muse-glimmer"; then
+    local scratch runlog timeout_bin=""
+    scratch="$(mktemp -d /tmp/rag-probe.XXXXXX)"
+    runlog="$scratch/run.log"
+    printf '{"permission":{"edit":"deny","bash":"deny"}}' > "$scratch/opencode.json"
+    command -v timeout >/dev/null 2>&1 && timeout_bin="timeout 300"
+    command -v gtimeout >/dev/null 2>&1 && timeout_bin="gtimeout 300"
+    log "retrieval probe: querying 'alice' via rag MCP tools (up to 5 min)..."
+    if [[ -n "$timeout_bin" ]]; then
+      # shellcheck disable=SC2086
+      $timeout_bin opencode run --dir "$scratch" -m ollama/muse-glimmer:30b-mlx \
+        --format json "Use your rag MCP tools: list the collections, then query collection 'alice' for 'who chases Alice at the start?'. Report the collection names and the top answer." \
+        >"$runlog" 2>&1 || warn "probe run exited nonzero (see below)."
+    else
+      warn "no timeout binary — running probe uncapped."
+      opencode run --dir "$scratch" -m ollama/muse-glimmer:30b-mlx \
+        --format json "Use your rag MCP tools: list the collections, then query collection 'alice' for 'who chases Alice at the start?'. Report the collection names and the top answer." \
+        >"$runlog" 2>&1 || warn "probe run exited nonzero (see below)."
+    fi
+    if grep -q '"tool":"rag' "$runlog" 2>/dev/null && grep -qi 'rabbit' "$runlog" 2>/dev/null; then
+      log "retrieval probe: PASS (rag tools called, White Rabbit grounded)."
+    else
+      warn "retrieval probe: FAIL — log kept at $runlog."; fail=1
+    fi
+    [[ "$fail" -eq 0 ]] && rm -rf "$scratch" || log "scratch kept at $scratch for inspection."
+  else
+    warn "retrieval probe: skipped (glimmer not served)."; fail=1
+  fi
+  # 3. Continue can only be checked statically here — the live half needs
+  # the VS Code GUI, so print the exact manual step.
+  local cfg="$HOME/.continue/config.yaml"
+  if grep -q 'mcpServers:' "$cfg" 2>/dev/null && grep -q "$SERVER:$MCP_PORT/mcp" "$cfg" 2>/dev/null; then
+    log "Continue config: remote rag MCP entry present."
+  else
+    warn "Continue config: rag MCP entry MISSING."; fail=1
+  fi
+  log "Manual (VS Code GUI): new Continue Agent session (Muse Glimmer 30B), ask: \"Using the rag tools, query collection 'alice' for who is accused of stealing the tarts, and cite the source chunk.\" Pass = rag_query called, Knave of Hearts answered."
+  [[ "$fail" -eq 0 ]] && log "retrieval verification: PASS." || warn "retrieval verification: INCOMPLETE."
+  return "$fail"
+}
+
 main() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -285,12 +309,18 @@ main() {
   detect_os
   preflight
   if [[ "$CHECK_ONLY" -eq 1 ]]; then verify; exit "$?"; fi
-  install_vscode
-  install_continue
+  install_continue || warn "continuing without the Continue extension."
   write_continue_config
   install_opencode
   write_opencode_config
-  verify
+  local rc=0
+  verify || rc=1
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "[dry-run] would run retrieval verification (live MCP probe)."
+  else
+    verify_retrieval || rc=1
+  fi
+  exit "$rc"
 }
 
 main "$@"
