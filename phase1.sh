@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# phase1.sh — Phase 1 base runtimes for local-intelligence-plan.md
+# phase1.sh — Phase 1 base runtimes for plans/local-intelligence-plan.md
 # Installs/verifies: Ollama (brew) + Ollama server, LM Studio (cask),
 # project-local .venv with mlx-lm. Idempotent — safe to re-run.
 # Target: macOS Apple Silicon. Model pulls are Phase 2, not here.

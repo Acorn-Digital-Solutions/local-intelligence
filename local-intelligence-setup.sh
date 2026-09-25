@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# local-intelligence-setup.sh — automate local-intelligence-plan.md
+# local-intelligence-setup.sh — automate plans/local-intelligence-plan.md
 # Target: Mac Pro M4 Ultra, 128GB unified RAM, macOS Apple Silicon
 # Step-by-step build: Phase 1 (base runtimes) -> Phase 2 (models) -> Phase 3 (RAG) -> Phase 4 (chat UI) -> Phase 5 (LAN access).
 # Optimize lives outside setup: ./benchmark.sh (standalone).
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PLAN_FILE="$ROOT_DIR/local-intelligence-plan.md"
+PLAN_FILE="$ROOT_DIR/plans/local-intelligence-plan.md"
 
 log() { printf '[local-intelligence] %s\n' "$*"; }
 die() { printf '[local-intelligence] ERROR: %s\n' "$*" >&2; exit 1; }

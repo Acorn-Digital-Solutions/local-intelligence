@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# phase2.sh — Phase 2 models for local-intelligence-plan.md
+# phase2.sh — Phase 2 models for plans/local-intelligence-plan.md
 # Pulls via Ollama: coder + reasoning + 70B fallback + embeddings (all Q4_K_M
 # upstream defaults). Idempotent — skips models already present.
 # Requires Phase 1 (ollama binary + server). Model pulls are large (~85GB

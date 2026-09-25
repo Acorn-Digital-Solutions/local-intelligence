@@ -73,7 +73,7 @@ Pass = non-null `tool_calls` with the right name and arguments.
 
 ## 6. Update docs
 
-- `local-intelligence-plan.md`: model lists and guidance in sections 2,
+- `plans/local-intelligence-plan.md`: model lists and guidance in sections 2,
   4, 7, 8 as applicable (keep the "proven via :11434/v1" claims true).
 - `demo/*/README.md` + `demo/README.md`: update `opencode run -m …`
   flags if the recommended default changed.

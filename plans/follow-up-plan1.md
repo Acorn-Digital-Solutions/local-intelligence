@@ -80,6 +80,6 @@ Files + terminal only goes so far; target "does the whole task".
 ## Standing rules
 
 - Every change is scored with the Step 1 harness before adoption.
-- Docs follow code: `local-intelligence-plan.md`, `continue-config.yaml`,
+- Docs follow code: `local-intelligence-plan.md` (same dir), `../continue-config.yaml`,
   `AGENT_MODELS`/provider, and demo READMEs stay in sync (see the
   `add-ollama-model` skill for the model-change checklist).
