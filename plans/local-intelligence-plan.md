@@ -317,3 +317,48 @@ Agent-mode notes (verified live against Continue 2.0.0):
   instead of relying on the read tool; start a fresh session after
   config changes (old sessions keep their original model). For
   unattended runs prefer opencode (§7) over Continue Agent.
+
+## 9. Client machines + RAG MCP service
+
+This Mac is the server; daily work happens on client machines on the same
+LAN. Two halves, both required for retrieval on clients:
+
+Server side — persistent RAG MCP service (`rag_mcp.py`, stdio for local
+use + `streamable-http` for clients, tools: `rag_query`, `rag_ingest`,
+`rag_collections`):
+
+1. The installed copy lives at
+   `~/Library/LaunchAgents/org.local-intel.rag-mcp.plist`, generated
+   from the repo template `rag-mcp.launchd.plist` (`__ROOT__` replaced
+   with the checkout path). Serve binds `0.0.0.0:8011`.
+2. Load/unload from your own Terminal (agent shells can't bootstrap):
+   `launchctl load -w ~/Library/LaunchAgents/org.local-intel.rag-mcp.plist`
+   (modern form `launchctl bootstrap gui/$(id -u) <same file>` fails with
+   error 5 on this machine; unload: `launchctl unload <same file>`).
+3. Verify: `curl -s -o /dev/null -w "%{http_code}\n"
+   http://127.0.0.1:8011/mcp` → `400` (means alive: the endpoint wants
+   POST). Logs: `/tmp/rag-mcp.log`. `RunAtLoad` + `KeepAlive` keep it
+   up across logins and crashes.
+4. SECURITY: no auth — trusted LAN only, same posture as the Phase 5
+   Ollama bind. Never port-forward `:8011` to the internet.
+
+Client side — one script does it all (`client-setup.sh`, self-contained,
+macOS with Homebrew or apt/dnf Linux; Windows via WSL2):
+
+1. Copy it over: `scp client-setup.sh user@client:~/`
+2. On the client: `bash ~/client-setup.sh` (`--server HOST` to override
+   the default `compute.local`, e.g. the server's LAN IP if mDNS fails;
+   `--dry-run` / `--check-only` supported).
+3. It installs VS Code (+ `code` on PATH) + the Continue extension,
+   writes `~/.continue/config.yaml` (server models, tool-pin rules,
+   remote `rag` MCP entry), installs opencode, and merges
+   `provider.ollama` (models enumerated live from the server) +
+   `mcp.rag` into `~/.config/opencode/opencode.jsonc`. Existing configs
+   are backed up, never clobbered. LAN hosts bypass any proxy env.
+4. Verify on the client: `opencode models ollama` lists server models;
+   new Continue Agent session defaults to Glimmer.
+
+Troubleshooting: server checks first from the client
+(`curl http://compute.local:11434/api/tags`,
+`curl http://compute.local:8011/mcp` → 400); Continue MCP tools appear
+only when the server-side service (§9, server half) is running.

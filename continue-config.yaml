@@ -77,3 +77,12 @@ rules:
   # ("Tool ... not found", "Cannot read properties of undefined"). Exact
   # built-in tool names + arguments in Continue 2.0.0 (verified in bundle):
   - "Agent tools - exact names and arguments only: read_file(filepath), read_file_range(filepath, startLine, endLine), create_new_file(filepath, contents), grep_search(query), file_glob_search(pattern), ls(dirPath), run_terminal_command(command), fetch_url_content(url), search_web(query). Lowercase filepath/contents/query - never filePath, fileContent, or pattern for grep. Never invent variants like file_read, run_terminal, run_shell_command, or fetch_url."
+# Project Qdrant retrieval (rag_mcp.py). Stdio entry works only on the
+# machine hosting the checkout — replace __ROOT__ with its real path.
+# LAN clients use the remote form instead (see client-setup.sh).
+#mcpServers:
+#  - name: rag
+#    type: stdio
+#    command: __ROOT__/.venv/bin/python
+#    args: [__ROOT__/rag_mcp.py]
+#    cwd: __ROOT__

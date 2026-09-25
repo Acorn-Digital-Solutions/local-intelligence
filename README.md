@@ -38,6 +38,8 @@ Full design rationale lives in `plans/`.
 | `benchmark.sh` | MLX vs GGUF speed shootout (standalone) |
 | `skills/` | Agent skills (`run-setup`, `add-ollama-model`) for Continue `read_skill` |
 | `cleanup.sh` | Tear down containers/volumes |
+| `client-setup.sh` | Self-contained client installer (VS Code + Continue + opencode → this server) |
+| `rag_mcp.py` + `rag-mcp.launchd.plist` | RAG over MCP (stdio local, HTTP for clients) |
 | `.vscode/settings.json` | Applies automatically when this folder is open (uses `.venv`) |
 
 ## Setup in detail
