@@ -13,3 +13,6 @@ python3 check.py
 
 Pass = `answers.md` names the page title, the slideshow author and the
 temperature unit, each with its source URL (verified by `check.py`).
+
+With the server-hosted MCP service running, agents can fetch the three URLs
+through `agent-tools` `web_fetch(url)`.

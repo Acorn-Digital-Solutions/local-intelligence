@@ -1,7 +1,7 @@
 # Demo 02 — task (answer from the live web)
 
-Visit each URL (curl, a browser, or the agent's web tools) and write
-`answers.md` with the three answers. Every answer must cite its source URL.
+Use the server-hosted `agent-tools` MCP `web_fetch(url)` tool to visit each URL
+and write `answers.md` with the three answers. Every answer must cite its source URL.
 
 1. https://example.com — what is the page's `<title>`?
 2. https://httpbin.org/json — who is the slideshow author?

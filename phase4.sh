@@ -214,8 +214,12 @@ provs["ollama"] = {
     "options": tpl["options"],
     "models": models,
 }
+d.setdefault("mcp", {}).update({
+  "rag": {"type": "remote", "url": "http://127.0.0.1:8011/mcp"},
+  "agent-tools": {"type": "remote", "url": "http://127.0.0.1:8012/mcp"},
+})
 json.dump(d, open(p, "w"), indent=2)
-print(f"provider.ollama written ({len(models)} models)")
+print(f"provider.ollama + remote MCP servers written ({len(models)} models)")
 EOF
   opencode models ollama 2>/dev/null | grep -q "$AGENT_MODEL" \
     && log "ollama provider validated ($(opencode models ollama 2>/dev/null | grep -c . ) local models listed)." \

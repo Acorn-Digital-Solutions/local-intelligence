@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- org.local-intel.agent-tools-mcp — server-hosted agent tools over HTTP.
+       Install after replacing __ROOT__ with the checkout path; see plan §9. -->
+  <key>Label</key><string>org.local-intel.agent-tools-mcp</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__ROOT__/.venv/bin/python</string>
+    <string>__ROOT__/agent_tools_mcp.py</string>
+    <string>--transport</string><string>streamable-http</string>
+    <string>--host</string><string>0.0.0.0</string>
+    <string>--port</string><string>8012</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/tmp/agent-tools-mcp.log</string>
+  <key>StandardErrorPath</key><string>/tmp/agent-tools-mcp.log</string>
+</dict>
+</plist>

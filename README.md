@@ -33,6 +33,7 @@ Full design rationale lives in `plans/`.
 | `continue-config.yaml` | Continue template → copy to `~/.continue/config.yaml` |
 | `configs/` | Script-read configs: opencode provider (server), opencode client defaults, eval permissions, Continue client template |
 | `rag_demo.py` | Qdrant ingest + query CLI for project RAG |
+| `agent_tools_mcp.py` + `agent-tools-mcp.launchd.plist` | Server-hosted web fetch + sequential-thinking tools over MCP |
 | `demo/` | Three agent demos (code, live web, long text) + graders |
 | `eval.sh` | Model × demo eval matrix (outputs gitignored) |
 | `benchmark.sh` | MLX vs GGUF speed shootout (standalone) |
@@ -50,9 +51,9 @@ Full design rationale lives in `plans/`.
 2. **Models** — coder + reasoning + 70B fallback + embeddings
    (`--skip-70b` saves ~40GB). Agentic models (Glimmer, GPT-OSS, Qwen3)
    are pulled by phase 4 / on demand — see the `add-ollama-model` skill.
-3. **RAG** — Qdrant container + deps + ingest/verify (`--recreate` rebuilds).
-4. **Chat UI + agent** — Open WebUI on `:3000`, opencode provider merge,
-   agentic smoke test.
+3. **RAG** — Qdrant container + deps + ingest/verify (`--recreate` rebuilds); installs the MCP SDK.
+4. **Chat UI + agent** — Open WebUI on `:3000`, opencode provider + MCP
+  endpoints, agentic smoke test. Start the MCP services separately; see plan §9.
 5. **LAN access** — binds Ollama to all interfaces (`compute.local`).
    Trusted home LAN only: Ollama has no login.
 
