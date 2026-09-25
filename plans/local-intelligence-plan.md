@@ -349,12 +349,16 @@ macOS with Homebrew or apt/dnf Linux; Windows via WSL2):
 2. On the client: `bash ~/client-setup.sh` (`--server HOST` to override
    the default `compute.local`, e.g. the server's LAN IP if mDNS fails;
    `--dry-run` / `--check-only` supported).
-3. It installs VS Code (+ `code` on PATH) + the Continue extension,
-   writes `~/.continue/config.yaml` (server models, tool-pin rules,
-   remote `rag` MCP entry), installs opencode, and merges
-   `provider.ollama` (models enumerated live from the server) +
-   `mcp.rag` into `~/.config/opencode/opencode.jsonc`. Existing configs
-   are backed up, never clobbered. LAN hosts bypass any proxy env.
+3. It installs the Continue extension (needs VS Code with `code` on
+   PATH already — not installed by the script), writes
+   `~/.continue/config.yaml` (server models, tool-pin rules, remote
+   `rag` MCP entry), installs opencode, and merges `provider.ollama`
+   (models enumerated live from the server) + `mcp.rag` into
+   `~/.config/opencode/opencode.jsonc`, setting the default model to
+   Qwen3-Coder 30B (best coding model with proven tool-calling; small
+   model: 1.5B coder). Existing configs are backed up,
+   never clobbered. LAN hosts bypass any proxy env. It finishes with a
+   live retrieval verification (MCP probe + Continue checks).
 4. Verify on the client: `opencode models ollama` lists server models;
    new Continue Agent session defaults to Glimmer.
 

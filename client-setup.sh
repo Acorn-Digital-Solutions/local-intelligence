@@ -202,6 +202,14 @@ try:
 except ValueError as e:
     raise SystemExit(f"refusing to touch {p} (not plain JSON): {e}")
 d.setdefault("$schema", "https://opencode.ai/config.json")
+order = ["qwen3-coder:30b", "gpt-oss:120b", "muse-glimmer:30b-mlx"]
+default = next((f"ollama/{m}" for m in order if m in models), None)
+if default:
+    d["model"] = default
+small = "ollama/qwen2.5-coder:1.5b" if "qwen2.5-coder:1.5b" in models else default
+if small:
+    d["small_model"] = small
+print(f"default model: {default}, small model: {small}")
 provs = d.setdefault("provider", {})
 provs["ollama"] = {
     "npm": "@ai-sdk/openai-compatible",
@@ -226,6 +234,9 @@ verify() {
     opencode models ollama 2>/dev/null | grep -q "muse-glimmer" \
       && log "opencode ollama provider: $(opencode models ollama 2>/dev/null | grep -c .) models" \
       || { warn "opencode ollama provider: NOT listing server models"; fail=1; }
+    local defmod
+    defmod="$(grep -o '"model": *"[^"]*"' "$HOME/.config/opencode/opencode.jsonc" 2>/dev/null | head -n 1)"
+    if [[ -n "$defmod" ]]; then log "opencode default: $defmod"; else warn "opencode default model: NOT SET"; fail=1; fi
   else
     warn "opencode: MISSING"; fail=1
   fi
