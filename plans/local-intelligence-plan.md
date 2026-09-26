@@ -69,7 +69,7 @@ Phase 3 — RAG stack:
 - LlamaIndex or LangChain + Qdrant (scale) or Chroma (prototype) + Qwen3-Embedding / BGE-M3
 
 Phase 4 — chat UI with RAG (the friendly front door):
-- Open WebUI `v0.11.3` container, implemented + verified by `phase4.sh`
+- Open WebUI `v0.11.4` container, implemented + verified by `phase4.sh`
 - Wired to Ollama via `host.docker.internal:11434` for chat AND embeddings
   (`RAG_EMBEDDING_ENGINE=ollama`, `RAG_EMBEDDING_MODEL=nomic-embed-text`;
   env vars apply on a fresh volume — a volume created without them keeps
@@ -342,6 +342,24 @@ use + `streamable-http` for clients, tools: `rag_query`, `rag_ingest`,
 4. SECURITY: no auth — trusted LAN only, same posture as the Phase 5
    Ollama bind. Never port-forward `:8011` to the internet.
 
+Server side — persistent agent-tools MCP service (`agent_tools_mcp.py`,
+Streamable HTTP on port 8012; tools: `web_fetch(url)` and
+`sequential_thinking(...)`):
+
+1. Phase 3 installs the Python MCP SDK. Generate and load its launchd service
+  from the template:
+  `sed "s|__ROOT__|$PWD|g" agent-tools-mcp.launchd.plist >
+  ~/Library/LaunchAgents/org.local-intel.agent-tools-mcp.plist`
+  then `launchctl load -w
+  ~/Library/LaunchAgents/org.local-intel.agent-tools-mcp.plist`.
+2. Verify on the host with
+  `curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8012/mcp`
+  (expected `400`, because the endpoint requires POST). Logs:
+  `/tmp/agent-tools-mcp.log`.
+3. Fetch allows public HTTP(S) destinations and caps response size. The
+  endpoint has no authentication; keep it on the trusted LAN and never
+  port-forward `:8012` to the internet.
+
 Client side — one script does it all (`client-setup.sh`, self-contained,
 macOS with Homebrew or apt/dnf Linux; Windows via WSL2):
 
@@ -352,12 +370,14 @@ macOS with Homebrew or apt/dnf Linux; Windows via WSL2):
    server's LAN IP if mDNS fails; `--dry-run` / `--check-only`
    supported). Client Continue/opencode values come from
    `configs/continue-client-config.yaml` and
-   `configs/opencode-client-defaults.json` — edit those, not the script.
+  `configs/opencode-client-defaults.json` — edit those, not the script.
+  The agent-tools endpoint defaults to port 8012; override it with
+  `--tools-mcp-port` or `AGENT_TOOLS_MCP_PORT`.
 3. It installs the Continue extension (needs VS Code with `code` on
    PATH already — not installed by the script), writes
-   `~/.continue/config.yaml` (server models, tool-pin rules, remote
-   `rag` MCP entry), installs opencode, and merges `provider.ollama`
-   (models enumerated live from the server) + `mcp.rag` into
+  `~/.continue/config.yaml` (server models, tool-pin rules, remote
+  `rag` and `agent-tools` MCP entries), installs opencode, and merges
+  `provider.ollama` (models enumerated live from the server) + remote MCPs into
    `~/.config/opencode/opencode.jsonc`, setting the default model to
    Qwen3-Coder 30B (best coding model with proven tool-calling; small
    model: 1.5B coder). Existing configs are backed up,

@@ -9,14 +9,14 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_PY="$ROOT_DIR/.venv/bin/python"
-WEBUI_IMAGE="ghcr.io/open-webui/open-webui:v0.11.3"
+WEBUI_IMAGE="ghcr.io/open-webui/open-webui:v0.11.4"
 WEBUI_NAME="open-webui"
 WEBUI_URL="http://127.0.0.1:3000"
 OLLAMA_URL="http://127.0.0.1:11434"
 OLLAMA_DOCKER_URL="http://host.docker.internal:11434"
 CHAT_MODEL="qwen2.5-coder:32b"
 EMBED_MODEL="nomic-embed-text"
-ADMIN_EMAIL="admin@example.com"
+ADMIN_EMAIL="admin@localintelligence.com"
 ADMIN_PASSWORD="${OPENWEBUI_ADMIN_PASSWORD:-local-admin-changeme}"
 
 DRY_RUN=0
@@ -214,8 +214,12 @@ provs["ollama"] = {
     "options": tpl["options"],
     "models": models,
 }
+d.setdefault("mcp", {}).update({
+  "rag": {"type": "remote", "url": "http://127.0.0.1:8011/mcp"},
+  "agent-tools": {"type": "remote", "url": "http://127.0.0.1:8012/mcp"},
+})
 json.dump(d, open(p, "w"), indent=2)
-print(f"provider.ollama written ({len(models)} models)")
+print(f"provider.ollama + remote MCP servers written ({len(models)} models)")
 EOF
   opencode models ollama 2>/dev/null | grep -q "$AGENT_MODEL" \
     && log "ollama provider validated ($(opencode models ollama 2>/dev/null | grep -c . ) local models listed)." \
