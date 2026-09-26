@@ -69,7 +69,7 @@ Phase 3 — RAG stack:
 - LlamaIndex or LangChain + Qdrant (scale) or Chroma (prototype) + Qwen3-Embedding / BGE-M3
 
 Phase 4 — chat UI with RAG (the friendly front door):
-- Open WebUI `v0.11.3` container, implemented + verified by `phase4.sh`
+- Open WebUI `v0.11.4` container, implemented + verified by `phase4.sh`
 - Wired to Ollama via `host.docker.internal:11434` for chat AND embeddings
   (`RAG_EMBEDDING_ENGINE=ollama`, `RAG_EMBEDDING_MODEL=nomic-embed-text`;
   env vars apply on a fresh volume — a volume created without them keeps

@@ -70,6 +70,9 @@ Pass = non-null `tool_calls` with the right name and arguments.
   `opencode run --dir <dir> -m ollama/<model> "Create hello.py
   containing exactly print('OK'). Do not run anything."` must create
   the file.
+- Clients pick the model up on the next `client-setup.sh` run (models
+  enumerated live; add to `model_order` in
+  `configs/opencode-client-defaults.json` for default/agentic status).
 
 ## 6. Update docs
 
