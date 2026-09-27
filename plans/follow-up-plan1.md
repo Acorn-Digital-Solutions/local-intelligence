@@ -49,10 +49,10 @@ Files + terminal only goes so far; target "does the whole task".
 - Acceptance: demo 02 research loop runs stronger/faster with fetch;
   no regressions in 01/03 per the harness.
 
-Implementation: `agent_tools_mcp.py` is configured to serve `web_fetch` and
-`sequential_thinking` from the model host on port 8012. OpenCode and Continue
-connect over Streamable HTTP; deployment and verification are in
-`plans/local-intelligence-plan.md` §9.
+Implementation: `agent_tools_mcp.py` is configured to serve `web_search`,
+`web_fetch`, and `sequential_thinking` from the model host on port 8012.
+OpenCode and Continue connect over Streamable HTTP; deployment and
+verification are in `plans/local-intelligence-plan.md` §9.
 
 ## Step 4 — Align limits and residency (free performance)
 

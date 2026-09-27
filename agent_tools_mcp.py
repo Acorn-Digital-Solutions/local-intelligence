@@ -93,6 +93,8 @@ def readable_page(body: bytes, content_type: str) -> tuple[str, str]:
 def web_fetch(url: str) -> str:
     """Fetch a public HTTP(S) page and return its title and readable text.
 
+    Use web_search first to discover URLs unless the URL is already known.
+
     Args:
         url: Public HTTP or HTTPS URL to fetch.
     """
@@ -123,8 +125,44 @@ def web_fetch(url: str) -> str:
             if truncated or len(text) > MAX_OUTPUT_CHARS:
                 result.append("[Response truncated]")
             return "\n".join(result)
-    except (OSError, ValueError, urllib.error.URLError) as exc:
+    except Exception as exc:  # noqa: BLE001 — surface as tool result, not crash
         return f"Fetch failed: {exc}"
+
+
+@server.tool()
+def web_search(query: str, count: int = 5) -> str:
+    """Search the public web and return titles, URLs, and snippets.
+
+    Use this for current or live information (weather, prices, news,
+    recent events) and to discover page URLs. Results are titles and
+    snippets only: always web_fetch the most relevant URL(s) to get
+    details before answering — never ask the user to pick a source.
+
+    Args:
+        query: Search keywords or a question.
+        count: Number of results to return (1-10, default 5).
+    """
+    query = (query or "").strip()
+    if not query:
+        return "Search failed: query must not be empty."
+    count = max(1, min(int(count), 10))
+    try:
+        from ddgs import DDGS
+
+        results = DDGS().text(query, max_results=count) or []
+    except ImportError:
+        return "Search failed: search backend not installed (phase3 installs it)."
+    except Exception as exc:  # noqa: BLE001 — surface as tool result, not crash
+        return f"Search failed: {exc}"
+    if not results:
+        return f"No results for {query!r}."
+    lines = []
+    for i, r in enumerate(results[:count], 1):
+        title = (r.get("title") or "untitled").strip()
+        url = (r.get("href") or r.get("url") or "").strip()
+        snippet = (r.get("body") or "").strip().replace("\n", " ")
+        lines.append(f"{i}. {title}\n   URL: {url}\n   {snippet[:500]}")
+    return "\n".join(lines)[:MAX_OUTPUT_CHARS]
 
 
 @server.tool()

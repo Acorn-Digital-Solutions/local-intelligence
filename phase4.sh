@@ -90,6 +90,8 @@ ensure_webui() {
       -e RAG_EMBEDDING_ENGINE=ollama \
       -e "RAG_EMBEDDING_MODEL=$EMBED_MODEL" \
       -e "RAG_OLLAMA_BASE_URL=$OLLAMA_DOCKER_URL" \
+      -e ENABLE_WEB_SEARCH=true \
+      -e WEB_SEARCH_ENGINE=duckduckgo \
       "$WEBUI_IMAGE" >/dev/null
   fi
   if [[ "$DRY_RUN" -eq 1 ]]; then
@@ -123,6 +125,58 @@ webui_token() {
     return 1
   fi
   echo "$token"
+}
+
+# Web-search defaults (best effort, never fails the phase): fresh containers
+# seed DuckDuckGo via the -e flags above; model rows default to legacy
+# function calling so the chat Web Search toggle injects results without
+# per-chat setup (native mode needs the model to call the tool itself).
+# Fill-missing only — deliberate per-model UI changes are preserved.
+ensure_websearch_defaults() {
+  if [[ "$CHECK_ONLY" -eq 1 || "$DRY_RUN" -eq 1 ]]; then
+    log "web-search defaults skipped (no-change mode)."
+    return 0
+  fi
+  local token
+  token="$(webui_token)" || { warn "web-search defaults skipped (admin auth failed)."; return 0; }
+  set +e
+  WEBUI_URL="$WEBUI_URL" WEBUI_TOKEN="$token" "$VENV_PY" - <<'EOF'
+import json, os, urllib.request
+base = os.environ["WEBUI_URL"]
+token = os.environ["WEBUI_TOKEN"]
+def api(method, path, data=None):
+    req = urllib.request.Request(
+        base + path,
+        data=json.dumps(data).encode() if data is not None else None,
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        method=method,
+    )
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.load(r)
+models = api("GET", "/api/v1/models/base") or []
+if not models:
+    api("GET", "/api/models")  # warm discovery, then re-read
+    models = api("GET", "/api/v1/models/base") or []
+changed = 0
+for m in models:
+    params = m.get("params") or {}
+    if params.get("function_calling"):
+        continue
+    params["function_calling"] = "legacy"
+    api("POST", "/api/v1/models/model/update", {
+        "id": m["id"], "base_model_id": m.get("base_model_id"),
+        "name": m["name"], "meta": m.get("meta") or {},
+        "params": params, "is_active": m.get("is_active", True),
+    })
+    changed += 1
+print(f"web-search defaults OK ({changed} models set to legacy, {len(models)} total)")
+EOF
+  local py_rc=$?
+  set -e
+  if [[ "$py_rc" -ne 0 ]]; then
+    warn "web-search defaults top-up failed (continuing)."
+  fi
+  return 0
 }
 
 OPENCODE_CFG="$HOME/.config/opencode/opencode.jsonc"
@@ -327,6 +381,7 @@ main() {
   local rc=0
   ensure_webui || rc=1
   ensure_opencode || rc=1
+  ensure_websearch_defaults || rc=1
   # Verification runs at the end of every phase, even on partial failure.
   verify || rc=1
   [[ "$DRY_RUN" -eq 1 ]] && log "Done (dry run) — nothing changed."

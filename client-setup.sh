@@ -22,6 +22,7 @@ MCP_PORT="${MCP_PORT:-8011}"
 TOOLS_MCP_PORT="${AGENT_TOOLS_MCP_PORT:-8012}"
 DRY_RUN=0
 CHECK_ONLY=0
+ALLOW_LOCAL=0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_DIR="${CLIENT_CONFIG_DIR:-$SCRIPT_DIR/configs}"
 
@@ -40,6 +41,7 @@ Options:
   --tools-mcp-port P  agent-tools MCP port (default: 8012, env AGENT_TOOLS_MCP_PORT)
   --dry-run      Print what would change, do nothing
   --check-only   Verify server reachability + what is installed, change nothing
+  --allow-local  Permit running from the server checkout (normally refused)
   -h, --help     Show this help
 EOF
 }
@@ -270,10 +272,19 @@ main() {
       --tools-mcp-port) TOOLS_MCP_PORT="$2"; shift 2 ;;
       --dry-run) DRY_RUN=1; shift ;;
       --check-only) CHECK_ONLY=1; shift ;;
+      --allow-local) ALLOW_LOCAL=1; shift ;;
       -h|--help) usage; exit 0 ;;
       *) die "unknown arg: $1 (try --help)" ;;
     esac
   done
+  if [[ "$ALLOW_LOCAL" -eq 0 && -f "$SCRIPT_DIR/phase4.sh" ]]; then
+    local _hn
+    _hn="$(hostname 2>/dev/null || echo unknown)"
+    case "$SERVER" in
+      127.0.0.1|localhost|"$_hn"|"${_hn%%.*}")
+        die "refusing to target this machine ($SERVER) from the server checkout ($SCRIPT_DIR) — this script configures LAN *clients*; the server itself is configured by phase4.sh. Override: --allow-local." ;;
+    esac
+  fi
   # The server is LAN-local: never route it through an HTTP(S) proxy
   # (corporate laptops often export proxy env vars that break .local).
   export no_proxy="${no_proxy:+$no_proxy,}$SERVER"
