@@ -93,7 +93,7 @@ ensure_qdrant() {
 
 ensure_py() {
   # Core RAG deps are pinned; MCP runtime and CA bundle use current releases.
-  local pkgs=("qdrant-client==1.17.1" "llama-index==0.14.22" "llama-index-embeddings-ollama" "mcp" "certifi")
+  local pkgs=("qdrant-client==1.17.1" "llama-index==0.14.22" "llama-index-embeddings-ollama" "mcp" "certifi" "ddgs")
   local missing=() p mod
   for p in "${pkgs[@]}"; do
     mod="$(echo "$p" | sed -E 's/^([a-zA-Z0-9_]+).*/\1/;s/-/_/g')"

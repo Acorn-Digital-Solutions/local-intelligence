@@ -77,6 +77,9 @@ Phase 4 — chat UI with RAG (the friendly front door):
 - Persistent `open-webui-data` volume; reachable at `localhost:3000`
 - Knowledge base: upload project docs into a Collection per project, ask
   grounded questions in chat (retrieval happens behind the scenes)
+- Web search: DuckDuckGo backend (keyless), models default to legacy
+  function calling so the chat Web Search toggle injects results
+  (`ensure_websearch_defaults` in `phase4.sh`, fill-missing only)
 - Stretch: back collections with the Phase 3 Qdrant (`:6333`) so the UI
   and `rag_demo.py` share one index — still open
 - Terminal agent: OpenCode (MIT terminal coding agent) driving local models
@@ -343,8 +346,8 @@ use + `streamable-http` for clients, tools: `rag_query`, `rag_ingest`,
    Ollama bind. Never port-forward `:8011` to the internet.
 
 Server side — persistent agent-tools MCP service (`agent_tools_mcp.py`,
-Streamable HTTP on port 8012; tools: `web_fetch(url)` and
-`sequential_thinking(...)`):
+Streamable HTTP on port 8012; tools: `web_search(query)`,
+`web_fetch(url)`, and `sequential_thinking(...)`):
 
 1. Phase 3 installs the Python MCP SDK. Generate and load its launchd service
   from the template:

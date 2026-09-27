@@ -33,7 +33,7 @@ Full design rationale lives in `plans/`.
 | `continue-config.yaml` | Continue template → copy to `~/.continue/config.yaml` |
 | `configs/` | Script-read configs: opencode provider (server), opencode client defaults, eval permissions, Continue client template |
 | `rag_demo.py` | Qdrant ingest + query CLI for project RAG |
-| `agent_tools_mcp.py` + `agent-tools-mcp.launchd.plist` | Server-hosted web fetch + sequential-thinking tools over MCP |
+| `agent_tools_mcp.py` + `agent-tools-mcp.launchd.plist` | Server-hosted web search/fetch + sequential-thinking tools over MCP |
 | `demo/` | Three agent demos (code, live web, long text) + graders |
 | `eval.sh` | Model × demo eval matrix (outputs gitignored) |
 | `benchmark.sh` | MLX vs GGUF speed shootout (standalone) |
