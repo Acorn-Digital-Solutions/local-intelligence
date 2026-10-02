@@ -259,7 +259,7 @@ verify_retrieval() {
   else
     warn "Continue config: remote rag or agent-tools MCP entry MISSING."; fail=1
   fi
-  log "Manual (VS Code GUI): new Continue Agent session (Muse Glimmer 30B), ask: \"Using the rag tools, query collection 'alice' for who is accused of stealing the tarts, and cite the source chunk.\" Pass = rag_query called, Knave of Hearts answered."
+  log "Manual (VS Code GUI): flip the input-bar mode toggle to Agent (MCP tools don't exist in Chat mode — models just narrate fake calls there), new Agent session (Muse Glimmer 30B), ask: \"Using the rag tools, query collection 'alice' for who is accused of stealing the tarts, and cite the source chunk.\" Pass = rag_query called, Knave of Hearts answered."
   [[ "$fail" -eq 0 ]] && log "retrieval verification: PASS." || warn "retrieval verification: INCOMPLETE."
   return "$fail"
 }
