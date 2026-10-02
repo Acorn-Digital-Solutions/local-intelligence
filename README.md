@@ -69,16 +69,21 @@ opencode models ollama                                         # check wiring
 ```
 
 Model guide: Glimmer for agentic edits (fast, MLX), GPT-OSS 120B when
-quality beats speed, Qwen3 backup, Qwen2.5-Coder for chat Q&A,
+quality beats speed, Qwen3 backup, Qwen2.5-Coder for plain chat Q&A
+(no tools — it narrates tool calls as text instead of invoking them,
+so switch to Glimmer for anything needing web, MCP, or file tools),
 DeepSeek-R1 for step-by-step reasoning. Pre-allow permissions per
 project with a local `opencode.json`
 (`{"permission":{"edit":"allow","bash":"deny"}}`); never `--auto`.
 
 **VS Code (Continue):** install the Continue extension, open this folder,
-`cp continue-config.yaml ~/.continue/config.yaml`. Agent mode needs the
-`Muse Glimmer 30B (agentic)` picker entry — Qwen2.5 narrates tool calls
-as text and can't drive tools. `Cmd+Enter` accepts each approval prompt
-(approvals are per-call by design). See plan §8 + Agent-mode notes.
+`cp continue-config.yaml ~/.continue/config.yaml`. Switch the input-bar
+mode toggle to **Agent** — MCP tools (RAG, web search/fetch) don't exist
+in Chat mode, and models asked to use tools there just narrate fake calls
+as text. Agent mode needs the `Muse Glimmer 30B (agentic)` picker entry —
+Qwen2.5 narrates tool calls as text and can't drive tools. `Cmd+Enter`
+accepts each approval prompt (approvals are per-call by design). See plan
+§8 + Agent-mode notes.
 
 **Chat UI:** http://localhost:3000 — upload docs into a Knowledge
 collection, ask grounded questions.
