@@ -2,6 +2,7 @@
 """Server-hosted web fetch and sequential-thinking MCP tools."""
 import argparse
 import html.parser
+import http.client
 import ipaddress
 import ssl
 import socket
@@ -21,6 +22,23 @@ MAX_RESPONSE_BYTES = 1_000_000
 MAX_OUTPUT_CHARS = 20_000
 
 
+def _resolve_public_addresses(host: str, port: int | None):
+    try:
+        results = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except OSError as exc:
+        raise ValueError(f"Could not resolve hostname: {exc}") from exc
+    if not results:
+        raise ValueError("Could not resolve hostname")
+    for result in results:
+        try:
+            address = ipaddress.ip_address(result[4][0])
+        except ValueError as exc:
+            raise ValueError("Only publicly routable hosts can be fetched") from exc
+        if not address.is_global:
+            raise ValueError("Only publicly routable hosts can be fetched")
+    return results
+
+
 def validate_public_url(url: str) -> None:
     parsed = urllib.parse.urlsplit(url)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
@@ -28,17 +46,63 @@ def validate_public_url(url: str) -> None:
     if parsed.username or parsed.password:
         raise ValueError("URLs containing credentials are not supported")
     try:
-        addresses = [ipaddress.ip_address(parsed.hostname)]
+        address = ipaddress.ip_address(parsed.hostname)
     except ValueError:
+        _resolve_public_addresses(parsed.hostname, None)
+    else:
+        if not address.is_global:
+            raise ValueError("Only publicly routable hosts can be fetched")
+
+
+def _connect_public_socket(host, port, timeout, source_address):
+    addresses = _resolve_public_addresses(host, port)
+    last_error = None
+    for family, socktype, proto, _, sockaddr in addresses:
+        sock = socket.socket(family, socktype, proto)
         try:
-            addresses = [
-                ipaddress.ip_address(result[4][0])
-                for result in socket.getaddrinfo(parsed.hostname, None, type=socket.SOCK_STREAM)
-            ]
+            if timeout is not socket._GLOBAL_DEFAULT_TIMEOUT:
+                sock.settimeout(timeout)
+            if source_address:
+                sock.bind(source_address)
+            sock.connect(sockaddr)
+            return sock
         except OSError as exc:
-            raise ValueError(f"Could not resolve hostname: {exc}") from exc
-    if not addresses or any(not address.is_global for address in addresses):
-        raise ValueError("Only publicly routable hosts can be fetched")
+            last_error = exc
+            sock.close()
+    if last_error:
+        raise last_error
+    raise OSError("Could not connect to public host")
+
+
+class PublicHTTPConnection(http.client.HTTPConnection):
+    def connect(self):
+        self.sock = _connect_public_socket(self.host, self.port, self.timeout, self.source_address)
+
+
+class PublicHTTPSConnection(http.client.HTTPSConnection):
+    def connect(self):
+        self.sock = _connect_public_socket(self.host, self.port, self.timeout, self.source_address)
+        server_hostname = self._tunnel_host or self.host
+        try:
+            self.sock = self._context.wrap_socket(self.sock, server_hostname=server_hostname)
+        except Exception:
+            self.sock.close()
+            raise
+
+
+class PublicHTTPHandler(urllib.request.HTTPHandler):
+    def http_open(self, req):
+        return self.do_open(PublicHTTPConnection, req)
+
+
+class PublicHTTPSHandler(urllib.request.HTTPSHandler):
+    def https_open(self, req):
+        return self.do_open(
+            PublicHTTPSConnection,
+            req,
+            context=self._context,
+            check_hostname=self._check_hostname,
+        )
 
 
 class PublicRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -104,9 +168,13 @@ def web_fetch(url: str) -> str:
             url,
             headers={"User-Agent": "local-intelligence-mcp/1.0", "Accept": "text/html,application/json,text/plain,*/*"},
         )
-        handlers = [PublicRedirectHandler()]
-        if certifi:
-            handlers.append(urllib.request.HTTPSHandler(context=ssl.create_default_context(cafile=certifi.where())))
+        context = ssl.create_default_context(cafile=certifi.where() if certifi else None)
+        handlers = [
+            urllib.request.ProxyHandler({}),
+            PublicHTTPHandler(),
+            PublicHTTPSHandler(context=context),
+            PublicRedirectHandler(),
+        ]
         opener = urllib.request.build_opener(*handlers)
         with opener.open(request, timeout=20) as response:
             content_type = response.headers.get("Content-Type", "")
