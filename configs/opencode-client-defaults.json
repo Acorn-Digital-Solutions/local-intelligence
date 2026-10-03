@@ -1,6 +1,10 @@
 {
-  "$comment": "Client opencode defaults, read by client-setup.sh. Single source for model preference order, display suffixes, limits, and skip rules — edit here, never in the script.",
-  "model_order": ["qwen3-coder:30b", "gpt-oss:120b", "muse-glimmer:30b-mlx"],
+  "$comment": "Client opencode defaults, read by client-setup.sh. Single source for model preference order, display suffixes, limits, and skip rules \u2014 edit here, never in the script.",
+  "model_order": [
+    "qwen3-coder:30b",
+    "gpt-oss:120b",
+    "muse-glimmer:30b-mlx"
+  ],
   "small_model": "qwen2.5-coder:1.5b",
   "provider_name": "Ollama (server)",
   "npm": "@ai-sdk/openai-compatible",
@@ -10,7 +14,28 @@
     "context": 32768,
     "output": 8192
   },
-  "skip_substrings": ["embed", "bge-m3", "mxbai"],
+  "skip_substrings": [
+    "embed",
+    "bge-m3",
+    "mxbai"
+  ],
   "mcp_name": "rag",
-  "agent_tools_mcp_name": "agent-tools"
+  "agent_tools_mcp_name": "agent-tools",
+  "permission": {
+    "edit": "ask",
+    "bash": "allow"
+  },
+  "lsp": true,
+  "agent": {
+    "explore": {
+      "description": "Read-only codebase explorer. Use for broad searches (where is X defined/used, how does Y work) so the main agent keeps its context small.",
+      "mode": "subagent",
+      "permission": {
+        "edit": "deny",
+        "bash": "deny",
+        "webfetch": "deny"
+      },
+      "prompt": "You are a read-only code explorer. Locate code with grep and glob, read the relevant files, and answer with concise findings: file paths with line numbers and short quotes. Never modify files. Do not guess; if something is not found, say so."
+    }
+  }
 }

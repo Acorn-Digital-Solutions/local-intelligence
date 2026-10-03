@@ -173,6 +173,12 @@ d.setdefault("mcp", {})[defs.get("mcp_name", "rag")] = {
     "type": "remote", "url": f"http://{server}:{port}/mcp"}
 d["mcp"][defs.get("agent_tools_mcp_name", "agent-tools")] = {
   "type": "remote", "url": f"http://{server}:{tools_port}/mcp"}
+if defs.get("permission"):
+    d.setdefault("permission", {}).update(defs["permission"])
+if "lsp" in defs:
+    d["lsp"] = defs["lsp"]
+if defs.get("agent"):
+    d.setdefault("agent", {}).update(defs["agent"])
 json.dump(d, open(p, "w"), indent=2)
 print(f"provider.ollama + remote MCP servers written ({len(models)} models)")
 EOF
