@@ -56,7 +56,8 @@ models:
     apiBase: http://127.0.0.1:11434
     roles:
       - chat
-  # Codebase indexing (@codebase): same local embeddings as the RAG stack.
+  # Codebase indexing (@codebase): local embeddings via Ollama (also
+  # used by the Open WebUI chat UI for its Knowledge collections).
   - name: Nomic Embed Text
     provider: ollama
     model: nomic-embed-text
@@ -79,9 +80,6 @@ rules:
   - "Agent tools - exact names and arguments only: read_file(filepath), read_file_range(filepath, startLine, endLine), create_new_file(filepath, contents), grep_search(query), file_glob_search(pattern), ls(dirPath), run_terminal_command(command), fetch_url_content(url), search_web(query). Lowercase filepath/contents/query - never filePath, fileContent, or pattern for grep. Never invent variants like file_read, run_terminal, run_shell_command, or fetch_url."
   - "For live web research, use agent-tools web_search(query) to discover URLs, then web_fetch(url) for detail; use sequential_thinking(thought, thought_number, total_thoughts, next_thought_needed) for multi-step tasks."
 mcpServers:
-  - name: rag
-    type: streamable-http
-    url: http://127.0.0.1:8011/mcp
   - name: agent-tools
     type: streamable-http
     url: http://127.0.0.1:8012/mcp

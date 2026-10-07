@@ -46,14 +46,14 @@ Consensus picks 2025-2026:
 
 ## 3. App stack — fully local with Ollama
 
-- Frameworks:
-  - LangChain 1.3.2 / LangGraph 1.2.2 — agents, tool-calls, checkpointing
-  - LlamaIndex 0.14.22 — fastest RAG with Ollama llm+embed packages
-  - Haystack 2.29 — typed DAG, YAML-serializable, OTEL/Langfuse
-- Vector DBs:
-  - Chroma 1.5.9 `PersistentClient` SQLite+HNSW — prototype only (<100k docs, no quantization/sharding, ~57GB/10Mx1536-f32)
-  - Qdrant v1.17.1 Rust Docker REST/gRPC — scale pick, native pre-filter + INT8 quantization (~15GB same data, sub-20ms p95)
 - Frontend: Open WebUI / LibreChat pointing at Ollama `:11434` or LM Studio `:1234`
+
+(Dedicated vector-DB RAG retired 2026-10: agents navigate code with
+grep/glob/read at 131K context, so the Qdrant v1.17.1 + LlamaIndex
+ingest loop earned no use. Record of the old pick: Qdrant was the
+scale choice over Chroma-prototype-only. Semantic search remains via
+Continue `@codebase` and Open WebUI Knowledge, both on local Ollama
+embeddings.)
 
 ## 4. Phased setup
 
@@ -65,8 +65,9 @@ Phase 1 — base:
 Phase 2 — reasoning fallback:
 - Add DeepSeek-R1-Distill-Qwen-32B and Llama 3.3 70B Q4
 
-Phase 3 — RAG stack:
-- LlamaIndex or LangChain + Qdrant (scale) or Chroma (prototype) + Qwen3-Embedding / BGE-M3
+Phase 3 — RAG stack (RETIRED 2026-10: Qdrant + RAG-MCP removed,
+`phase3.sh` / `rag_demo.py` / `rag_mcp.py` deleted; agents read code
+directly, demo 03 rewritten as a direct long-context read).
 
 Phase 4 — chat UI with RAG (the friendly front door):
 - Open WebUI `v0.11.4` container, implemented + verified by `phase4.sh`
@@ -80,8 +81,6 @@ Phase 4 — chat UI with RAG (the friendly front door):
 - Web search: DuckDuckGo backend (keyless), models default to legacy
   function calling so the chat Web Search toggle injects results
   (`ensure_websearch_defaults` in `phase4.sh`, fill-missing only)
-- Stretch: back collections with the Phase 3 Qdrant (`:6333`) so the UI
-  and `rag_demo.py` share one index — still open
 - Terminal agent: OpenCode (MIT terminal coding agent) driving local models
   - Chosen over Claude Code, which is cloud-only and defeats this setup
   - Install: `brew install opencode`, or the user-local installer
@@ -155,46 +154,25 @@ Phase 2 — models:
   `-d '{"model":"qwen2.5-coder:32b","messages":[{"role":"user","content":"say OK"}]}'`
 - `ollama ps` → what's loaded now (size, GPU, context, keep-alive)
 
-Phase 3 — RAG (`./phase3.sh`: Qdrant v1.17.1 + `local-intel` collection):
-- `curl -s localhost:6333/collections` → Qdrant up with your collection
-- Try it: `.venv/bin/python rag_demo.py --query "Which embedding models does the plan recommend?"`
-  → scored hits citing `local-intelligence-plan.md`
-- Re-ingest after editing docs: `./phase3.sh --recreate`
-  (demo corpus is the project `*.md` files themselves)
+Phase 3 — RETIRED (was: Qdrant RAG + `rag_demo.py` ingest/verify;
+removed 2026-10, no manual checks remain).
 
-## 6. Using RAG on a new coding project
+## 6. Searching a new coding project (RAG retired)
 
-The idea in one paragraph: your files are split into chunks, each chunk is
-embedded locally (`nomic-embed-text` via Ollama) and stored in Qdrant with
-its source path. At ask time the question is embedded the same way, Qdrant
-returns the most similar chunks, and those chunks go into the model's prompt
-as context. No data leaves the machine at any step.
+The old Qdrant ingest/query loop was removed 2026-10 — agents navigate
+code well enough without it. Three paths, no ingest step:
 
-Walkthrough (example project at `~/code/myproj`, all commands from this repo
-dir so `.venv` resolves; one collection per project):
+1. Agent-native search (primary): `cd ~/code/myproj && opencode` (or a
+   Continue Agent session) and ask "where is auth handled?" — the agent
+   locates code with grep/glob/read at 131K context. The opencode
+   `explore` subagent (see `configs/opencode-client-defaults.json`)
+   keeps broad searches out of the main agent's context.
+2. Indexed search: Continue `@codebase` over the open workspace
+   (embedded locally by `nomic-embed-text` via Ollama).
+3. Doc Q&A: upload project docs into an Open WebUI Knowledge collection
+   (§4) and ask grounded questions in chat.
 
-1. Services up: `brew services start ollama` (persists across logins),
-   `docker start qdrant`. `./phase3.sh --check-only` confirms both plus
-   the embedding model.
-2. Ingest the code:
-   `.venv/bin/python rag_demo.py --corpus ~/code/myproj --pattern '**/*.py' --pattern '**/*.md' --collection myproj --ingest`
-   Junk (`.git`, `node_modules`, `__pycache__`, `.venv`, `dist`, `build`,
-   lockfiles, binaries) is skipped automatically. Re-runs upsert in place,
-   so re-ingest after edits is safe; add `--recreate` for a full rebuild.
-3. Ask:
-   `.venv/bin/python rag_demo.py --collection myproj --query "where is auth handled?"`
-   → top chunks with scores and source paths.
-4. Answer with the model, two options:
-   a. Manual: `ollama run qwen2.5-coder:32b`, paste the retrieved chunks
-      as context, then ask.
-   b. Scriptable: take step 3's chunks and call
-      `curl localhost:11434/api/generate -d '{"model":"qwen2.5-coder:32b","prompt":"Context:\n<chunks>\n\nQuestion: ...","stream":false}'`
-5. Housekeeping: `curl -s localhost:6333/collections` lists collections
-   (one per project keeps codebases from polluting each other).
-
-Tuning notes: code likes bigger chunks than prose (the 512/50 default is a
-fine start); `deepseek-r1:32b` reasons better over retrieved context but is
-verbose — coder first, reasoning when stuck.
+No data leaves the machine on any path.
 
 ## 7. Using OpenCode with local models
 
@@ -257,9 +235,9 @@ Path A — on this Mac, working in this repo
 2. Open this repo as the workspace: File → Open Folder →
    `~/local-intelligence`. `.vscode/settings.json` applies by itself —
    nothing to import. Why it exists: without it VS Code runs Python with
-   the system interpreter and `rag_demo.py` fails on missing deps; with
-   it, Run/Debug uses the project `.venv`. Confirm: status bar shows
-   `.venv`, and a new integrated terminal (`Ctrl+`` `) has the venv
+   the system interpreter and the demo checkers fail on missing deps;
+   with it, Run/Debug uses the project `.venv`. Confirm: status bar
+   shows `.venv`, and a new integrated terminal (`Ctrl+`` `) has the venv
    activated (`which python` → `.venv/bin/python`).
 3. Install the model config (one copy, user-wide — it then serves every
    project, not just this repo):
@@ -272,7 +250,7 @@ Path A — on this Mac, working in this repo
    `Qwen2.5-Coder 32B` for coding Q&A, `DeepSeek R1 32B` for
    step-by-step reasoning), `Cmd+I` inline edit, `@codebase` to ask
    over the indexed workspace (embedded locally by `nomic-embed-text`,
-   the same model as the Phase 3 RAG stack). Indexing runs on first use.
+   served by Ollama). Indexing runs on first use.
 
 Path B — from another computer on the LAN, no repo needed
 (prerequisites: Phase 5 done so Ollama is LAN-bound, server running):
@@ -321,36 +299,22 @@ Agent-mode notes (verified live against Continue 2.0.0):
   config changes (old sessions keep their original model). For
   unattended runs prefer opencode (§7) over Continue Agent.
 
-## 9. Client machines + RAG MCP service
+## 9. Client machines + agent-tools MCP service
 
 This Mac is the server; daily work happens on client machines on the same
-LAN. Two halves, both required for retrieval on clients:
-
-Server side — persistent RAG MCP service (`rag_mcp.py`, stdio for local
-use + `streamable-http` for clients, tools: `rag_query`, `rag_ingest`,
-`rag_collections`):
-
-1. The installed copy lives at
-   `~/Library/LaunchAgents/org.local-intel.rag-mcp.plist`, generated
-   from the repo template `rag-mcp.launchd.plist` (`__ROOT__` replaced
-   with the checkout path). Serve binds `0.0.0.0:8011`.
-2. Load/unload from your own Terminal (agent shells can't bootstrap):
-   `launchctl load -w ~/Library/LaunchAgents/org.local-intel.rag-mcp.plist`
-   (modern form `launchctl bootstrap gui/$(id -u) <same file>` fails with
-   error 5 on this machine; unload: `launchctl unload <same file>`).
-3. Verify: `curl -s -o /dev/null -w "%{http_code}\n"
-   http://127.0.0.1:8011/mcp` → `400` (means alive: the endpoint wants
-   POST). Logs: `/tmp/rag-mcp.log`. `RunAtLoad` + `KeepAlive` keep it
-   up across logins and crashes.
-4. SECURITY: no auth — trusted LAN only, same posture as the Phase 5
-   Ollama bind. Never port-forward `:8011` to the internet.
+LAN. (The old server-side RAG MCP service on `:8011` was retired with
+the Qdrant stack 2026-10 — if it still runs: `launchctl unload
+~/Library/LaunchAgents/org.local-intel.rag-mcp.plist`, delete the plist,
+then `docker rm -f qdrant` + `docker volume rm qdrant_storage`. Old
+`qdrant-client` / `llama-index` packages may linger in `.venv` —
+harmless, or rebuild the venv.)
 
 Server side — persistent agent-tools MCP service (`agent_tools_mcp.py`,
 Streamable HTTP on port 8012; tools: `web_search(query)`,
 `web_fetch(url)`, and `sequential_thinking(...)`):
 
-1. Phase 3 installs the Python MCP SDK. Generate and load its launchd service
-  from the template:
+1. Phase 4 installs the Python MCP deps (`mcp`, `certifi`, `ddgs`).
+  Generate and load its launchd service from the template:
   `sed "s|__ROOT__|$PWD|g" agent-tools-mcp.launchd.plist >
   ~/Library/LaunchAgents/org.local-intel.agent-tools-mcp.plist`
   then `launchctl load -w
@@ -379,17 +343,17 @@ macOS with Homebrew or apt/dnf Linux; Windows via WSL2):
 3. It installs the Continue extension (needs VS Code with `code` on
    PATH already — not installed by the script), writes
   `~/.continue/config.yaml` (server models, tool-pin rules, remote
-  `rag` and `agent-tools` MCP entries), installs opencode, and merges
-  `provider.ollama` (models enumerated live from the server) + remote MCPs into
-   `~/.config/opencode/opencode.jsonc`, setting the default model to
-   Qwen3-Coder 30B (best coding model with proven tool-calling; small
-   model: 1.5B coder). Existing configs are backed up,
-   never clobbered. LAN hosts bypass any proxy env. It finishes with a
-   live retrieval verification (MCP probe + Continue checks).
+  `agent-tools` MCP entry), installs opencode, and merges
+  `provider.ollama` (models enumerated live from the server) + the remote
+  agent-tools MCP entry into `~/.config/opencode/opencode.jsonc`,
+  setting the default model to Qwen3-Coder 30B (best coding model with
+  proven tool-calling; small model: 1.5B coder). Existing configs are
+  backed up, never clobbered. LAN hosts bypass any proxy env. It
+  finishes with an MCP verification (agent-tools checks + manual GUI step).
 4. Verify on the client: `opencode models ollama` lists server models;
    new Continue Agent session defaults to Glimmer.
 
 Troubleshooting: server checks first from the client
 (`curl http://compute.local:11434/api/tags`,
-`curl http://compute.local:8011/mcp` → 400); Continue MCP tools appear
-only when the server-side service (§9, server half) is running.
+`curl http://compute.local:8012/mcp` → 400); Continue MCP tools appear
+only when the server-side agent-tools service (§9, server half) is running.

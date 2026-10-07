@@ -2,8 +2,9 @@
 # phase4.sh — Phase 4 chat UI with RAG for plans/local-intelligence-plan.md
 # Runs Open WebUI (pinned image) wired to Ollama for chat + embeddings,
 # creates the admin user, and verifies a grounded RAG answer end to end.
-# Also ensures the OpenCode terminal agent binary (provider wiring for the
-# local models is finished once the binary is present — see ensure_opencode).
+# Also installs the agent-tools MCP python deps into .venv and ensures the
+# OpenCode terminal agent binary (provider wiring for the local models is
+# finished once the binary is present — see ensure_opencode).
 # Idempotent — safe to re-run.
 set -euo pipefail
 
@@ -179,6 +180,31 @@ EOF
   return 0
 }
 
+ensure_py() {
+  # MCP runtime for agent_tools_mcp.py: mcp is a hard dep, ddgs backs
+  # web_search, certifi backs TLS. Formerly installed by retired phase3.
+  local pkgs=("mcp" "certifi" "ddgs")
+  local missing=() p mod
+  for p in "${pkgs[@]}"; do
+    mod="$(echo "$p" | sed -E 's/^([a-zA-Z0-9_]+).*/\1/;s/-/_/g')"
+    "$VENV_PY" -c "import $mod" >/dev/null 2>&1 || missing+=("$p")
+  done
+  if [[ "${#missing[@]}" -eq 0 ]]; then
+    log "agent-tools python deps present."
+    return 0
+  fi
+  if [[ "$CHECK_ONLY" -eq 1 ]]; then
+    warn "agent-tools deps MISSING (check-only; would pip install): ${missing[*]}"
+    return 1
+  fi
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "[dry-run] would run: .venv/bin/pip install ${missing[*]}"
+    return 0
+  fi
+  log "Installing into project .venv: ${missing[*]}"
+  "$ROOT_DIR/.venv/bin/pip" install "${missing[@]}"
+}
+
 OPENCODE_CFG="$HOME/.config/opencode/opencode.jsonc"
 # Agentic-capable local models (tool_calls proven via :11434/v1; the 32B
 # chat/coder + r1-distill narrate tool calls as text instead of invoking
@@ -268,12 +294,11 @@ provs["ollama"] = {
     "options": tpl["options"],
     "models": models,
 }
-d.setdefault("mcp", {}).update({
-  "rag": {"type": "remote", "url": "http://127.0.0.1:8011/mcp"},
-  "agent-tools": {"type": "remote", "url": "http://127.0.0.1:8012/mcp"},
-})
+mcp = d.setdefault("mcp", {})
+mcp.pop("rag", None)  # retired Qdrant RAG server — drop if left over
+mcp["agent-tools"] = {"type": "remote", "url": "http://127.0.0.1:8012/mcp"}
 json.dump(d, open(p, "w"), indent=2)
-print(f"provider.ollama + remote MCP servers written ({len(models)} models)")
+print(f"provider.ollama + agent-tools MCP written ({len(models)} models)")
 EOF
   opencode models ollama 2>/dev/null | grep -q "$AGENT_MODEL" \
     && log "ollama provider validated ($(opencode models ollama 2>/dev/null | grep -c . ) local models listed)." \
@@ -380,6 +405,7 @@ main() {
   preflight
   local rc=0
   ensure_webui || rc=1
+  ensure_py || rc=1
   ensure_opencode || rc=1
   ensure_websearch_defaults || rc=1
   # Verification runs at the end of every phase, even on partial failure.

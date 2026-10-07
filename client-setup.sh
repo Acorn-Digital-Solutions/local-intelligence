@@ -7,18 +7,18 @@
 #
 # Installs + configures, all pointed at the server:
 #   - Continue extension + ~/.continue/config.yaml
-#     (models via http://SERVER:11434, RAG via http://SERVER:8011/mcp)
+#     (models via http://SERVER:11434, tools via http://SERVER:8012/mcp)
 #   - opencode + ~/.config/opencode/opencode.jsonc (same server wiring)
 #
 # Get it onto the client (server's repo root has both):
 #   scp -r client-setup.sh configs user@client:~/local-intel-client/ \
 #     && ssh user@client 'bash ~/local-intel-client/client-setup.sh'
 # Server prerequisites (else the script warns/fails): Ollama reachable at
-# SERVER:11434 (phase 5) and the RAG MCP service at SERVER:8011 (plan section 9).
+# SERVER:11434 (phase 5) and the agent-tools MCP service at SERVER:8012
+# (plan section 9).
 set -euo pipefail
 
 SERVER="${SERVER_HOST:-compute.local}"
-MCP_PORT="${MCP_PORT:-8011}"
 TOOLS_MCP_PORT="${AGENT_TOOLS_MCP_PORT:-8012}"
 DRY_RUN=0
 CHECK_ONLY=0
@@ -37,7 +37,6 @@ Usage: bash client-setup.sh [options]
 Options:
   --server HOST  local-intelligence server (default: compute.local,
                  env SERVER_HOST). Fall back to its LAN IP if mDNS fails.
-  --mcp-port P   RAG MCP port on the server (default: 8011, env MCP_PORT)
   --tools-mcp-port P  agent-tools MCP port (default: 8012, env AGENT_TOOLS_MCP_PORT)
   --dry-run      Print what would change, do nothing
   --check-only   Verify server reachability + what is installed, change nothing
@@ -66,11 +65,6 @@ preflight() {
   [[ -f "$CONFIG_DIR/continue-client-config.yaml" && -f "$CONFIG_DIR/opencode-client-defaults.json" ]] \
     || die "configs/ not found beside the script (want $CONFIG_DIR) — copy the script AND the configs directory (see header)."
   server_up || die "server Ollama unreachable at http://$SERVER:11434 — check the server (phase 5) and --server."
-  if mcp_up "$MCP_PORT"; then
-    log "server RAG MCP reachable at http://$SERVER:$MCP_PORT/mcp."
-  else
-    warn "server RAG MCP NOT reachable at http://$SERVER:$MCP_PORT/mcp — retrieval tools will fail until the server runs it (plan section 9)."
-  fi
   if mcp_up "$TOOLS_MCP_PORT"; then
     log "server agent-tools MCP reachable at http://$SERVER:$TOOLS_MCP_PORT/mcp."
   else
@@ -102,7 +96,7 @@ write_continue_config() {
     cp -p "$cfg" "$cfg.bak.$(date +%Y%m%d-%H%M%S)"
     log "backed up existing $cfg."
   fi
-  sed "s/__SERVER__/$SERVER/g; s/__MCP_PORT__/$MCP_PORT/g; s/__TOOLS_MCP_PORT__/$TOOLS_MCP_PORT/g" \
+  sed "s/__SERVER__/$SERVER/g; s/__TOOLS_MCP_PORT__/$TOOLS_MCP_PORT/g" \
     "$CONFIG_DIR/continue-client-config.yaml" > "$cfg"
   log "wrote $cfg."
 }
@@ -127,11 +121,11 @@ write_opencode_config() {
     cp -p "$cfg" "$cfg.bak.$(date +%Y%m%d-%H%M%S)"
     log "backed up existing $cfg."
   fi
-  SERVER="$SERVER" MCP_PORT="$MCP_PORT" TOOLS_MCP_PORT="$TOOLS_MCP_PORT" OPENCODE_CFG="$cfg" \
+  SERVER="$SERVER" TOOLS_MCP_PORT="$TOOLS_MCP_PORT" OPENCODE_CFG="$cfg" \
     CLIENT_DEFAULTS="$CONFIG_DIR/opencode-client-defaults.json" python3 - <<'EOF'
 import json, os, urllib.request
-server, port, tools_port, p = (os.environ["SERVER"], os.environ["MCP_PORT"],
-                               os.environ["TOOLS_MCP_PORT"], os.environ["OPENCODE_CFG"])
+server, tools_port, p = (os.environ["SERVER"],
+                         os.environ["TOOLS_MCP_PORT"], os.environ["OPENCODE_CFG"])
 defs = json.load(open(os.environ["CLIENT_DEFAULTS"]))
 with urllib.request.urlopen(f"http://{server}:11434/api/tags", timeout=15) as r:
     names = [m["name"] for m in json.load(r).get("models", [])]
@@ -169,10 +163,10 @@ provs["ollama"] = {
     "options": {"baseURL": f"http://{server}:11434/v1"},
     "models": models,
 }
-d.setdefault("mcp", {})[defs.get("mcp_name", "rag")] = {
-    "type": "remote", "url": f"http://{server}:{port}/mcp"}
-d["mcp"][defs.get("agent_tools_mcp_name", "agent-tools")] = {
-  "type": "remote", "url": f"http://{server}:{tools_port}/mcp"}
+mcp = d.setdefault("mcp", {})
+mcp.pop("rag", None)  # retired Qdrant RAG server — drop if left over
+mcp[defs.get("agent_tools_mcp_name", "agent-tools")] = {
+    "type": "remote", "url": f"http://{server}:{tools_port}/mcp"}
 if defs.get("permission"):
     d.setdefault("permission", {}).update(defs["permission"])
 if "lsp" in defs:
@@ -180,7 +174,7 @@ if "lsp" in defs:
 if defs.get("agent"):
     d.setdefault("agent", {}).update(defs["agent"])
 json.dump(d, open(p, "w"), indent=2)
-print(f"provider.ollama + remote MCP servers written ({len(models)} models)")
+print(f"provider.ollama + agent-tools MCP written ({len(models)} models)")
 EOF
   log "wrote $cfg."
 }
@@ -201,7 +195,6 @@ verify() {
   else
     warn "opencode: MISSING"; fail=1
   fi
-  mcp_up "$MCP_PORT" && log "RAG MCP: reachable" || warn "RAG MCP: unreachable (server-side, plan section 9)"
   mcp_up "$TOOLS_MCP_PORT" && log "agent-tools MCP: reachable" || warn "agent-tools MCP: unreachable (server-side, plan section 9)"
   if [[ "$fail" -eq 0 ]]; then
     log "client setup OK. Next: open VS Code, new Continue Agent session (Glimmer), or: opencode run -m ollama/muse-glimmer:30b-mlx \"...\""
@@ -211,62 +204,26 @@ verify() {
   return "$fail"
 }
 
-# Live retrieval verification (normal runs only; skipped under --check-only
-# because it takes minutes against the server models).
-verify_retrieval() {
+# MCP verification (normal runs only): the agent-tools server must be
+# listed by opencode and present in the Continue config. The live half
+# needs the VS Code GUI, so print the exact manual step.
+verify_mcp() {
   local fail=0
-  # 1. opencode must show the rag server connected.
-  if opencode mcp list 2>/dev/null | grep -qi 'rag'; then
-    log "opencode MCP: rag server listed."
-  else
-    warn "opencode MCP: rag server NOT listed."; fail=1
-  fi
   if opencode mcp list 2>/dev/null | grep -qi 'agent-tools'; then
     log "opencode MCP: agent-tools server listed."
   else
     warn "opencode MCP: agent-tools server NOT listed."; fail=1
   fi
-  # 2. Functional probe: read-only scratch project (edit+bash denied, so a
-  # grounded answer can only come through the rag MCP tools).
-  if opencode models ollama 2>/dev/null | grep -q "muse-glimmer"; then
-    local scratch runlog timeout_bin=""
-    scratch="$(mktemp -d /tmp/rag-probe.XXXXXX)"
-    runlog="$scratch/run.log"
-    printf '{"permission":{"edit":"deny","bash":"deny"}}' > "$scratch/opencode.json"
-    command -v timeout >/dev/null 2>&1 && timeout_bin="timeout 300"
-    command -v gtimeout >/dev/null 2>&1 && timeout_bin="gtimeout 300"
-    log "retrieval probe: querying 'alice' via rag MCP tools (up to 5 min)..."
-    if [[ -n "$timeout_bin" ]]; then
-      # shellcheck disable=SC2086
-      $timeout_bin opencode run --dir "$scratch" -m ollama/muse-glimmer:30b-mlx \
-        --format json "Use your rag MCP tools: list the collections, then query collection 'alice' for 'who chases Alice at the start?'. Report the collection names and the top answer." \
-        >"$runlog" 2>&1 || warn "probe run exited nonzero (see below)."
-    else
-      warn "no timeout binary — running probe uncapped."
-      opencode run --dir "$scratch" -m ollama/muse-glimmer:30b-mlx \
-        --format json "Use your rag MCP tools: list the collections, then query collection 'alice' for 'who chases Alice at the start?'. Report the collection names and the top answer." \
-        >"$runlog" 2>&1 || warn "probe run exited nonzero (see below)."
-    fi
-    if grep -q '"tool":"rag' "$runlog" 2>/dev/null && grep -qi 'rabbit' "$runlog" 2>/dev/null; then
-      log "retrieval probe: PASS (rag tools called, White Rabbit grounded)."
-    else
-      warn "retrieval probe: FAIL — log kept at $runlog."; fail=1
-    fi
-    [[ "$fail" -eq 0 ]] && rm -rf "$scratch" || log "scratch kept at $scratch for inspection."
-  else
-    warn "retrieval probe: skipped (glimmer not served)."; fail=1
-  fi
-  # 3. Continue can only be checked statically here — the live half needs
-  # the VS Code GUI, so print the exact manual step.
+  # The Continue config can only be checked statically here — the live
+  # half needs the VS Code GUI, so print the exact manual step.
   local cfg="$HOME/.continue/config.yaml"
-  if grep -q 'mcpServers:' "$cfg" 2>/dev/null && grep -q "$SERVER:$MCP_PORT/mcp" "$cfg" 2>/dev/null \
-      && grep -q "$SERVER:$TOOLS_MCP_PORT/mcp" "$cfg" 2>/dev/null; then
-    log "Continue config: remote rag and agent-tools MCP entries present."
+  if grep -q 'mcpServers:' "$cfg" 2>/dev/null && grep -q "$SERVER:$TOOLS_MCP_PORT/mcp" "$cfg" 2>/dev/null; then
+    log "Continue config: remote agent-tools MCP entry present."
   else
-    warn "Continue config: remote rag or agent-tools MCP entry MISSING."; fail=1
+    warn "Continue config: remote agent-tools MCP entry MISSING."; fail=1
   fi
-  log "Manual (VS Code GUI): flip the input-bar mode toggle to Agent (MCP tools don't exist in Chat mode — models just narrate fake calls there), new Agent session (Muse Glimmer 30B), ask: \"Using the rag tools, query collection 'alice' for who is accused of stealing the tarts, and cite the source chunk.\" Pass = rag_query called, Knave of Hearts answered."
-  [[ "$fail" -eq 0 ]] && log "retrieval verification: PASS." || warn "retrieval verification: INCOMPLETE."
+  log "Manual (VS Code GUI): flip the input-bar mode toggle to Agent (MCP tools don't exist in Chat mode — models just narrate fake calls there), new Agent session (Muse Glimmer 30B), ask: \"Using the agent-tools sequential_thinking tool, think through the first two steps of planning a haiku, then reply with the haiku.\" Pass = sequential_thinking called, haiku answered."
+  [[ "$fail" -eq 0 ]] && log "MCP verification: PASS." || warn "MCP verification: INCOMPLETE."
   return "$fail"
 }
 
@@ -274,7 +231,6 @@ main() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --server) SERVER="$2"; shift 2 ;;
-      --mcp-port) MCP_PORT="$2"; shift 2 ;;
       --tools-mcp-port) TOOLS_MCP_PORT="$2"; shift 2 ;;
       --dry-run) DRY_RUN=1; shift ;;
       --check-only) CHECK_ONLY=1; shift ;;
@@ -305,9 +261,9 @@ main() {
   local rc=0
   verify || rc=1
   if [[ "$DRY_RUN" -eq 1 ]]; then
-    log "[dry-run] would run retrieval verification (live MCP probe)."
+    log "[dry-run] would run MCP verification (agent-tools checks)."
   else
-    verify_retrieval || rc=1
+    verify_mcp || rc=1
   fi
   exit "$rc"
 }

@@ -1,6 +1,6 @@
 ---
 name: run-setup
-description: Execute local-intelligence-setup.sh to build or repair the local AI stack phase by phase (runtimes, models, RAG, chat UI, LAN access).
+description: Execute local-intelligence-setup.sh to build or repair the local AI stack phase by phase (runtimes, models, chat UI, LAN access).
 ---
 
 # Run the local-intelligence setup
@@ -18,11 +18,10 @@ Run in order on a fresh machine; later phases require earlier ones:
 2. `--phase2` — models via Ollama: `qwen2.5-coder:32b`,
    `deepseek-r1:32b`, `llama3.3:70b` (unless `--skip-70b`),
    `nomic-embed-text`. Large (~85GB, ~43GB skipped); disk checked first.
-3. `--phase3` — RAG: Qdrant container (pinned image, persistent volume),
-   RAG deps into `.venv`, ingest + grounded-retrieve verify. Needs Docker.
+3. `--phase3` — RETIRED (was: Qdrant RAG). Skip it; run 1, 2, 4, 5.
 4. `--phase4` — Open WebUI container (`:3000`) wired to Ollama for chat
-   + embeddings, plus OpenCode provider wiring for local models and an
-   agentic smoke test. Needs Docker.
+   + embeddings, agent-tools MCP python deps, plus OpenCode provider
+   wiring for local models and an agentic smoke test. Needs Docker.
 5. `--phase5` — LAN access: binds Ollama to all interfaces (persisted via
    brew services env) so `compute.local:11434`/`:3000` work from other
    machines. Trusted home LAN only — Ollama has no login.
@@ -34,12 +33,12 @@ Run in order on a fresh machine; later phases require earlier ones:
    `./local-intelligence-setup.sh --phaseN --check-only`
 2. Run the phase: `./local-intelligence-setup.sh --phaseN`
    (extra flags are forwarded: `--dry-run --check-only` everywhere,
-   plus `--skip-70b` for phase2, `--recreate` for phase3).
+   plus `--skip-70b` for phase2).
 3. Multiple phases run left to right:
    `./local-intelligence-setup.sh --phase1 --phase2`
 4. Confirm with the plan's manual checks (`plans/local-intelligence-plan.md`
    section 5), e.g. `curl -s localhost:11434/api/version`,
-   `ollama list`, `curl -s localhost:6333/collections`.
+   `ollama list`, `opencode models ollama`.
 
 ## Rules
 

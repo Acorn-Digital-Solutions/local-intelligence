@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # local-intelligence-setup.sh — automate plans/local-intelligence-plan.md
 # Target: Mac Pro M4 Ultra, 128GB unified RAM, macOS Apple Silicon
-# Step-by-step build: Phase 1 (base runtimes) -> Phase 2 (models) -> Phase 3 (RAG) -> Phase 4 (chat UI) -> Phase 5 (LAN access).
+# Step-by-step build: Phase 1 (base runtimes) -> Phase 2 (models) -> Phase 4 (chat UI + agent) -> Phase 5 (LAN access).
+# (Phase 3, Qdrant RAG, was retired — agents read code directly.)
 # Optimize lives outside setup: ./benchmark.sh (standalone).
 set -euo pipefail
 
@@ -20,8 +21,6 @@ Options:
             Extra flags forwarded to phase1.sh: --dry-run --check-only
   --phase2    Pull base models (Qwen coder + embeddings)
             Extra flags forwarded to phase2.sh: --dry-run --check-only --skip-70b
-  --phase3    Start RAG services (Qdrant)
-            Extra flags forwarded to phase3.sh: --dry-run --check-only --recreate
   --phase4    Chat UI with RAG (Open WebUI + OpenCode)
             Extra flags forwarded to phase4.sh: --dry-run --check-only
   --phase5    LAN access (Ollama + WebUI on local network)
@@ -53,17 +52,6 @@ phase2() {
   log "Phase 2: models (coder + reasoning + 70B fallback + embeddings)"
   if ((${#fwd[@]})); then "$ROOT_DIR/phase2.sh" "${fwd[@]}"; else "$ROOT_DIR/phase2.sh"; fi
 }
-phase3() {
-  local fwd=()
-  local a
-  for a in "$@"; do
-    case "$a" in
-      --dry-run|--check-only|--recreate) fwd+=("$a") ;;
-    esac
-  done
-  log "Phase 3: RAG (Qdrant + deps + ingest/verify demo)"
-  if ((${#fwd[@]})); then "$ROOT_DIR/phase3.sh" "${fwd[@]}"; else "$ROOT_DIR/phase3.sh"; fi
-}
 phase4() {
   local fwd=()
   local a
@@ -94,7 +82,6 @@ main() {
     case "$arg" in
       --phase1) phase1 "$@" ;;
       --phase2) phase2 "$@" ;;
-      --phase3) phase3 "$@" ;;
       --phase4) phase4 "$@" ;;
       --phase5) phase5 "$@" ;;
 

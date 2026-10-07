@@ -22,21 +22,14 @@ stops here.
 - Acceptance: one command produces a full pass/fail matrix for all three
   models; re-running is safe (demos reset or tolerate re-runs).
 
-## Step 2 — Close the retrieval gap
+## Step 2 — DROPPED (Qdrant RAG removed 2026-10)
 
-Agents today see only what fits in context; demo 03 is manual and
-Continue `@codebase` indexing is disabled (`disableIndexing: true`).
-
-- Re-enable Continue indexing (remove the disable flag, let first-use
-  indexing complete on the workspace).
-- Expose Qdrant retrieval inside the agent loop: prefer an MCP server
-  (works for both opencode and Continue via `mcpServers`); a thin script
-  tool (`rag_demo.py --collection … --query …`) is the fallback.
-- Evaluate an embedding upgrade (`nomic-embed-text` → `bge-m3` or
-  `qwen3-embedding`): re-ingest one collection, compare demo 03 scores
-  using the Step 1 harness before switching over.
-- Acceptance: demo 03 completable by the agent alone (no manual
-  ingest/query/paste step); `@codebase` answers over the workspace.
+Agents navigate code well enough with grep/glob/read at 131K context,
+so the Qdrant + RAG-MCP layer was removed instead of deepened: demo 03
+is now a direct long-context read (no ingest/query step), and
+`@codebase` remains the indexed-search path. The embedding-upgrade idea
+(`nomic-embed-text` → `bge-m3`/`qwen3-embedding`) is still open if
+`@codebase` quality ever needs it — score via the Step 1 harness.
 
 ## Step 3 — Add MCP servers (tool depth)
 
@@ -80,7 +73,6 @@ verification are in `plans/local-intelligence-plan.md` §9.
 ## Step 6 — Later / optional
 
 - IMATRIX-importance quants for quality at the same memory footprint.
-- WebUI → Qdrant backend (the stretch goal in `local-intelligence-plan.md` §4).
 - Run observability (Langfuse-style traces of prompts/tools/tokens).
 
 ## Standing rules

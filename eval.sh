@@ -62,10 +62,6 @@ preflight() {
   for m in $MODELS; do
     ollama show "$m" >/dev/null 2>&1 || die "model missing: $m (ollama pull it first)."
   done
-  if [[ "$DEMOS" == *"03"* ]]; then
-    curl -sf --max-time 5 localhost:6333/ >/dev/null 2>&1 \
-      || die "demo 03 needs Qdrant (:6333) — run phase3.sh first."
-  fi
   if [[ "$DEMOS" == *"02"* ]]; then
     curl -sf --max-time 8 -o /dev/null https://example.com 2>/dev/null \
       || die "demo 02 needs internet (https://example.com unreachable)."

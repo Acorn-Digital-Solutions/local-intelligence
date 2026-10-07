@@ -219,7 +219,7 @@ def web_search(query: str, count: int = 5) -> str:
 
         results = DDGS().text(query, max_results=count) or []
     except ImportError:
-        return "Search failed: search backend not installed (phase3 installs it)."
+        return "Search failed: search backend not installed (phase4 installs it)."
     except Exception as exc:  # noqa: BLE001 — surface as tool result, not crash
         return f"Search failed: {exc}"
     if not results:

@@ -19,7 +19,6 @@
     "bge-m3",
     "mxbai"
   ],
-  "mcp_name": "rag",
   "agent_tools_mcp_name": "agent-tools",
   "permission": {
     "edit": "ask",

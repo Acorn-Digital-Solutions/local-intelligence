@@ -24,7 +24,7 @@ Options:
 
 Applies (charger profile): sleep 0, displaysleep 10, disksleep 10, autorestart 1.
 Also sensible: System Settings > Lock Screen > require password (unattended box),
-and Docker Desktop > Start at login (Qdrant/WebUI after reboots).
+and Docker Desktop > Start at login (WebUI after reboots).
 EOF
 }
 
