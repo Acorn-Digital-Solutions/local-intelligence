@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- org.local-intel.webui-logs — `docker logs open-webui` over HTTP for the
+       Caddy /logs/webui route. Installed by phase5.sh (loopback-only :8013). -->
+  <key>Label</key><string>org.local-intel.webui-logs</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>__ROOT__/webui_logs.py</string>
+    <string>--host</string><string>127.0.0.1</string>
+    <string>--port</string><string>8013</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/tmp/webui-logs.log</string>
+  <key>StandardErrorPath</key><string>/tmp/webui-logs.log</string>
+</dict>
+</plist>

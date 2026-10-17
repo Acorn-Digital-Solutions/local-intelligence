@@ -1,0 +1,64 @@
+# Managed by local-intelligence phase5.sh — serve Open WebUI + Ollama on port 80.
+# :80 answers any Host (compute.local, LAN IP, localhost) over plain HTTP.
+#   /               -> Open WebUI container (:3000)
+#   /ollama/api/... -> Ollama API (:11434; OpenAI-compat at /ollama/v1/...)
+#   /logs/ollama    -> raw ollama service log (debug; Apple-Silicon brew path)
+#   /logs/caddy     -> raw caddy service log, incl. per-request access lines
+#   /logs/agent-tools -> raw agent-tools MCP log (/tmp file, debug)
+#   /logs/webui[?tail=N] -> open-webui container log via helper (:8013)
+#   /docs/*         -> docs site (site/); /docs/README.md -> live repo README
+# __ROOT__ is the repo checkout; phase5.sh substitutes it at install time.
+:80 {
+	# Per-request access log to stdout (brew captures it into caddy.log),
+	# so /logs/caddy shows every proxied request, not just startups.
+	log {
+		output stdout
+		format json
+	}
+	# handle_path strips the /ollama prefix before proxying.
+	handle_path /ollama/* {
+		reverse_proxy 127.0.0.1:11434
+	}
+	redir /ollama /ollama/ 308
+	# Fixed rewrites: no request input reaches the filesystem paths.
+	# no-store: logs are live data; browsers must never serve them from
+	# cache (a stale entry once masked real logs with the WebUI shell).
+	handle /logs/ollama* {
+		root * /opt/homebrew/var/log
+		rewrite * /ollama.log
+		header Cache-Control "no-store"
+		file_server
+	}
+	handle /logs/caddy* {
+		root * /opt/homebrew/var/log
+		rewrite * /caddy.log
+		header Cache-Control "no-store"
+		file_server
+	}
+	handle /logs/agent-tools* {
+		root * /tmp
+		rewrite * /agent-tools-mcp.log
+		header Cache-Control "no-store"
+		file_server
+	}
+	# Single-purpose helper answers any path; query (?tail=N) passes through.
+	handle /logs/webui* {
+		header Cache-Control "no-store"
+		reverse_proxy 127.0.0.1:8013
+	}
+	# Live repo README. Declared before /docs/* (also matches it): exact
+	# matchers sort first, so this wins for exactly /docs/README.md.
+	handle /docs/README.md {
+		root * __ROOT__
+		rewrite * /README.md
+		file_server
+	}
+	redir /docs /docs/ 308
+	handle_path /docs/* {
+		root * __ROOT__/site
+		file_server
+	}
+	handle {
+		reverse_proxy 127.0.0.1:3000
+	}
+}

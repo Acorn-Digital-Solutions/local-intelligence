@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>README — Local Intelligence</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="top">
+  <span class="brand">Local Intelligence</span>
+  <a href="index.html">Docs</a>
+  <a href="logs.html">Logs viewer</a>
+  <a href="readme.html">README</a>
+  <a href="/">Open WebUI</a>
+</nav>
+
+<article id="content"><p style="color:var(--muted)">Loading README…</p></article>
+
+<p style="color:var(--muted);font-size:13px;margin-top:24px">Rendered in your browser from the live <a href="README.md">raw README</a> — always current. <a href="index.html">Back to docs home</a>.</p>
+
+</div>
+<script>
+// Minimal markdown subset renderer: headings, fenced code, tables,
+// ordered/unordered lists (with continuations), bold, code spans,
+// [text](url) links, bare-URL autolink. Covers this repo's README;
+// anything else renders as plain paragraphs (never breaks).
+function esc(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function splitRow(line) {
+  const cells = [];
+  let cur = '', inCode = false;
+  for (const ch of line) {
+    if (ch === '`') inCode = !inCode;
+    if (ch === '|' && !inCode) { cells.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  cells.push(cur);
+  return cells.map(c => c.trim())
+    .filter((c, i, a) => (i > 0 && i < a.length - 1) || c !== '');
+}
+function inline(src) {
+  const codes = [], links = [];
+  src = src.replace(/`([^`\n]+)`/g, (m, g) => {
+    codes.push('<code>' + esc(g) + '</code>');
+    return '\u0000' + (codes.length - 1) + '\u0000';
+  });
+  src = src.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, t, u) => {
+    links.push([t, u]);
+    return '\u0001' + (links.length - 1) + '\u0001';
+  });
+  src = esc(src);
+  src = src.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  src = src.replace(/\bhttps?:\/\/[^\s<]+/g, (u) => {
+    let end = u.length;
+    while (end > 0 && '.,;:!?'.indexOf(u[end - 1]) !== -1) end--;
+    if (u[end - 1] === ')' && u.slice(0, end).indexOf('(') === -1) end--;
+    const url = u.slice(0, end), trail = u.slice(end);
+    return '<a href="' + url + '">' + url + '</a>' + trail;
+  });
+  src = src.replace(/\u0001(\d+)\u0001/g, (m, i) => {
+    const t = esc(links[+i][0]).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    return '<a href="' + esc(links[+i][1]) + '">' + t + '</a>';
+  });
+  src = src.replace(/\u0000(\d+)\u0000/g, (m, i) => codes[+i]);
+  return src;
+}
+function render(md) {
+  const lines = md.split('\n');
+  const out = [];
+  let i = 0;
+  const para = [];
+  const flushPara = () => {
+    if (para.length) { out.push('<p>' + inline(para.join('\n')) + '</p>'); para.length = 0; }
+  };
+  while (i < lines.length) {
+    const line = lines[i];
+    let m = line.match(/^```(\w*)\s*$/);
+    if (m) {
+      flushPara();
+      const lang = m[1], buf = [];
+      i++;
+      while (i < lines.length && lines[i].indexOf('```') !== 0) { buf.push(lines[i]); i++; }
+      i++;
+      out.push('<pre><code' + (lang ? ' class="language-' + lang + '"' : '') + '>'
+        + esc(buf.join('\n')) + '</code></pre>');
+      continue;
+    }
+    m = line.match(/^(#{1,6})\s+(.*)$/);
+    if (m) {
+      flushPara();
+      out.push('<h' + m[1].length + '>' + inline(m[2]) + '</h' + m[1].length + '>');
+      i++;
+      continue;
+    }
+    if (line.indexOf('|') !== -1 && i + 1 < lines.length
+        && /^[\s|:~-]+$/.test(lines[i + 1]) && lines[i + 1].indexOf('-') !== -1) {
+      flushPara();
+      const head = splitRow(line);
+      i += 2;
+      const rows = [];
+      while (i < lines.length && lines[i].indexOf('|') !== -1 && lines[i].trim() !== '') {
+        rows.push(splitRow(lines[i]));
+        i++;
+      }
+      out.push('<table><thead><tr>'
+        + head.map(c => '<th>' + inline(c) + '</th>').join('')
+        + '</tr></thead><tbody>'
+        + rows.map(r => '<tr>' + r.map(c => '<td>' + inline(c) + '</td>').join('') + '</tr>').join('')
+        + '</tbody></table>');
+      continue;
+    }
+    m = line.match(/^(\s*)([-*]|\d+\.)\s+(.*)$/);
+    if (m && m[1] === '') {
+      flushPara();
+      const ordered = /^\d/.test(m[2]);
+      const items = [];
+      while (i < lines.length) {
+        const lm = lines[i].match(/^(\s*)([-*]|\d+\.)\s+(.*)$/);
+        if (lm && lm[1] === '') { items.push([lm[3]]); i++; }
+        else if (/^\s+\S/.test(lines[i]) && items.length) {
+          items[items.length - 1].push(lines[i].trim());
+          i++;
+        }
+        else break;
+      }
+      const tag = ordered ? 'ol' : 'ul';
+      out.push('<' + tag + '>'
+        + items.map(it => '<li>' + inline(it.join(' ')) + '</li>').join('')
+        + '</' + tag + '>');
+      continue;
+    }
+    if (line.trim() === '') { flushPara(); i++; continue; }
+    para.push(line);
+    i++;
+  }
+  flushPara();
+  return out.join('\n');
+}
+fetch('README.md', {cache: 'no-store'})
+  .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+  .then(t => { document.getElementById('content').innerHTML = render(t); })
+  .catch(e => { document.getElementById('content').innerHTML =
+    '<p>Could not load README: ' + esc(e.message) + '</p>'; });
+</script>
+</body>
+</html>

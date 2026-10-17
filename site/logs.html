@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Logs viewer — Local Intelligence</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="top">
+  <span class="brand">Local Intelligence</span>
+  <a href="index.html">Docs</a>
+  <a href="logs.html">Logs viewer</a>
+  <a href="readme.html">README</a>
+  <a href="/">Open WebUI</a>
+</nav>
+
+<h1 style="margin-bottom:0">Logs viewer</h1>
+<p style="color:var(--muted);margin-top:4px">Every service log, in the browser. Same origin, no login.</p>
+
+<div class="tabs">
+  <button class="tab active" data-ep="ollama">ollama</button>
+  <button class="tab" data-ep="caddy">caddy</button>
+  <button class="tab" data-ep="agent-tools">agent-tools</button>
+  <button class="tab" data-ep="webui">webui</button>
+</div>
+
+<div class="controls">
+  <input type="text" id="filter" placeholder="filter lines (case-insensitive)">
+  <input type="number" id="tail" value="500" min="1" max="5000" title="lines to show">
+  <button id="refresh">Refresh</button>
+  <label><input type="checkbox" id="auto"> auto-refresh 5s</label>
+</div>
+
+<div class="meta" id="meta">loading…</div>
+<pre id="out"></pre>
+<div class="rawlink">Raw endpoint: <a id="raw" href="/logs/ollama">/logs/ollama</a></div>
+
+</div>
+<script>
+const ENDPOINTS = {
+  ollama:        {url: '/logs/ollama', range: true},
+  caddy:         {url: '/logs/caddy', range: true},
+  'agent-tools': {url: '/logs/agent-tools', range: true},
+  webui:         {url: '/logs/webui', range: false},
+};
+const WINDOW = 262144; // 256 KB suffix window for large files
+let current = 'ollama';
+let lastText = '';
+let lastNote = '';
+let timer = null;
+let loadGen = 0;
+
+const out = document.getElementById('out');
+const meta = document.getElementById('meta');
+const filterEl = document.getElementById('filter');
+const tailEl = document.getElementById('tail');
+
+function tailN() {
+  const n = parseInt(tailEl.value, 10);
+  return Number.isFinite(n) ? Math.max(1, Math.min(5000, n)) : 500;
+}
+
+async function fetchBody(ep) {
+  if (!ENDPOINTS[ep].range) {
+    const r = await fetch(ENDPOINTS[ep].url + '?tail=' + tailN(), {cache: 'no-store'});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return {text: await r.text(), note: ''};
+  }
+  const url = ENDPOINTS[ep].url;
+  let note = '';
+  let headers = {};
+  // no-store: logs are live data; a cached entry (e.g. the WebUI shell
+  // from before a route existed) would otherwise mask fresh content.
+  try {
+    const head = await fetch(url, {method: 'HEAD', cache: 'no-store'});
+    const size = parseInt(head.headers.get('Content-Length') || '0', 10);
+    if (size > WINDOW) {
+      headers = {Range: 'bytes=-' + WINDOW};
+      note = 'showing last 256 KB of ' + (size / 1048576).toFixed(1) + ' MB';
+    }
+  } catch (e) { /* fall through to full GET */ }
+  const r = await fetch(url, {headers: headers, cache: 'no-store'});
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return {text: await r.text(), note: note};
+}
+
+function render() {
+  const q = filterEl.value.toLowerCase();
+  let lines = lastText.split('\n');
+  if (q) lines = lines.filter(l => l.toLowerCase().indexOf(q) !== -1);
+  if (lines.length && lines[lines.length - 1] === '') lines.pop();
+  lines = lines.slice(-tailN());
+  out.textContent = lines.join('\n');
+  meta.textContent = current + ': ' + lines.length + ' lines'
+    + (lastNote ? ' — ' + lastNote : '')
+    + (q ? ' — filter: "' + filterEl.value + '"' : '');
+}
+
+async function refresh() {
+  const my = ++loadGen; // drop stale results if the user switches tabs mid-load
+  meta.textContent = current + ': loading…';
+  try {
+    const res = await fetchBody(current);
+    if (my !== loadGen) return;
+    lastText = res.text;
+    lastNote = res.note;
+    render();
+  } catch (e) {
+    if (my !== loadGen) return;
+    meta.textContent = current + ': failed to load: ' + e.message;
+  }
+}
+
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    current = btn.getAttribute('data-ep');
+    document.getElementById('raw').href = ENDPOINTS[current].url;
+    document.getElementById('raw').textContent = ENDPOINTS[current].url;
+    refresh();
+  });
+});
+document.getElementById('refresh').addEventListener('click', refresh);
+document.getElementById('auto').addEventListener('change', e => {
+  if (timer) { clearInterval(timer); timer = null; }
+  if (e.target.checked) timer = setInterval(refresh, 5000);
+});
+filterEl.addEventListener('input', render);
+tailEl.addEventListener('change', () => {
+  if (ENDPOINTS[current].range) render(); else refresh();
+});
+refresh();
+</script>
+</body>
+</html>

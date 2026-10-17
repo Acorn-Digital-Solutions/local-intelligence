@@ -40,6 +40,7 @@ Full design rationale lives in `plans/`.
 | `skills/` | Agent skills (`run-setup`, `add-ollama-model`) for Continue `read_skill` |
 | `cleanup.sh` | Tear down containers/volumes |
 | `client-setup.sh` | Self-contained client setup (Continue + opencode → this server; needs VS Code pre-installed) |
+| `site/` | Docs site at `http://compute.local/docs/` (`index.html`, logs viewer `logs.html`, rendered README `readme.html`, shared `assets/style.css`; vanilla, no external assets) |
 | `.vscode/settings.json` | Applies automatically when this folder is open (uses `.venv`) |
 
 ## Setup in detail
@@ -54,7 +55,11 @@ Full design rationale lives in `plans/`.
    navigate code with grep/glob/read at 131K context instead.
 4. **Chat UI + agent** — Open WebUI on `:3000`, opencode provider + MCP
   endpoint, agentic smoke test. Start the agent-tools MCP service separately; see plan §9.
-5. **LAN access** — binds Ollama to all interfaces (`compute.local`).
+5. **LAN access** — binds Ollama to all interfaces, pins `compute.local`,
+   serves the chat UI on port 80 (`http://compute.local`, Caddy → :3000),
+   the Ollama API at `http://compute.local/ollama/api`, raw service
+   logs at `http://compute.local/logs/{ollama,caddy,agent-tools,webui}`,
+   and the docs site + logs viewer at `http://compute.local/docs/`.
    Trusted home LAN only: Ollama has no login.
 
 ## Daily use

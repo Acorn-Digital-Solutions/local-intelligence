@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Local Intelligence</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="wrap">
+
+<nav class="top">
+  <span class="brand">Local Intelligence</span>
+  <a href="index.html">Docs</a>
+  <a href="logs.html">Logs viewer</a>
+  <a href="readme.html">README</a>
+  <a href="/">Open WebUI</a>
+</nav>
+
+<div class="hero">
+  <h1>Local Intelligence</h1>
+  <p>Local AI environment on this Mac: Ollama-served open models driving terminal
+  agents, VS Code agents, and a chat UI. No cloud traffic. This page is served
+  from the machine itself at <code>http://compute.local/docs/</code>.</p>
+  <div class="btn-row">
+    <a class="btn primary" href="/">Open chat UI</a>
+    <a class="btn" href="logs.html">View logs</a>
+    <a class="btn" href="readme.html">README</a>
+  </div>
+</div>
+
+<h2>Services</h2>
+<div class="grid">
+  <div class="card" data-check="/">
+    <h3><span class="dot"></span>Chat UI</h3>
+    <p>Open WebUI: chat, document Q&amp;A, model picker. Login required.</p>
+    <a href="/">compute.local</a>
+  </div>
+  <div class="card" data-check="/ollama/api/version">
+    <h3><span class="dot"></span>Ollama API</h3>
+    <p>Model serving + OpenAI-compatible API. No login — trusted LAN only.</p>
+    <a href="/ollama/api/version">version</a> · <a href="/ollama/api/tags">models</a>
+  </div>
+  <div class="card" data-check="logs.html">
+    <h3><span class="dot"></span>Logs viewer</h3>
+    <p>Browse every service log in the browser, with filter and auto-refresh.</p>
+    <a href="logs.html">open viewer</a>
+  </div>
+</div>
+
+<h2>Endpoints</h2>
+<table>
+  <tr><th>URL</th><th>What</th></tr>
+  <tr><td><a href="/"><code>/</code></a></td><td>Chat UI (Open WebUI, login)</td></tr>
+  <tr><td><code>/ollama/api/*</code></td><td>Ollama REST API (<a href="/ollama/api/tags">tags</a>, <a href="/ollama/api/version">version</a>)</td></tr>
+  <tr><td><code>/ollama/v1/*</code></td><td>OpenAI-compatible API — use as client <code>baseURL</code></td></tr>
+  <tr><td><a href="/logs/ollama"><code>/logs/ollama</code></a></td><td>Raw Ollama service log</td></tr>
+  <tr><td><a href="/logs/caddy"><code>/logs/caddy</code></a></td><td>Caddy log, incl. per-request access lines</td></tr>
+  <tr><td><a href="/logs/agent-tools"><code>/logs/agent-tools</code></a></td><td>Agent-tools MCP server log</td></tr>
+  <tr><td><a href="/logs/webui?tail=100"><code>/logs/webui?tail=N</code></a></td><td>Chat UI container log (default tail 500)</td></tr>
+  <tr><td><a href="logs.html"><code>/docs/logs.html</code></a></td><td>Log viewer web app</td></tr>
+  <tr><td><a href="readme.html"><code>/docs/readme.html</code></a></td><td>Repository README, rendered (<a href="README.md">raw source</a>)</td></tr>
+  <tr><td><code>:11434</code></td><td>Ollama direct (same API as <code>/ollama/*</code>)</td></tr>
+  <tr><td><code>:3000</code></td><td>Chat UI direct (same app as <code>/</code>)</td></tr>
+  <tr><td><code>:8012</code></td><td>Agent-tools MCP endpoint (<code>/mcp</code>)</td></tr>
+</table>
+
+<h2>From your terminal</h2>
+<pre>curl http://compute.local/ollama/api/tags        # models as JSON
+curl http://compute.local/logs/ollama | tail -5  # recent server activity
+opencode run -m ollama/muse-glimmer:30b-mlx "add retry logic"  # terminal agent
+opencode models ollama                           # check provider wiring</pre>
+
+<h2>Clients on other machines</h2>
+<p>Point Continue and opencode at <code>http://compute.local:11434</code>
+(or the no-port <code>http://compute.local/ollama/v1</code> baseURL), MCP tools at
+<code>http://compute.local:8012/mcp</code>. The repo's
+<code>client-setup.sh</code> automates this. Full setup and model guide:
+<a href="readme.html">README</a>.</p>
+
+<footer>
+  Served from <code>compute.local</code> by Caddy · repo: <code>local-intelligence/site/</code> ·
+  <a href="readme.html">README</a>
+</footer>
+
+</div>
+<script>
+async function check(el) {
+  const url = el.getAttribute('data-check');
+  const dot = el.querySelector('.dot');
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 6000);
+  try {
+    const r = await fetch(url, {signal: ctrl.signal, cache: 'no-store'});
+    dot.classList.add(r.ok ? 'ok' : 'bad');
+  } catch (e) {
+    dot.classList.add('bad');
+  } finally {
+    clearTimeout(t);
+  }
+}
+document.querySelectorAll('[data-check]').forEach(check);
+</script>
+</body>
+</html>
