@@ -2,7 +2,9 @@
 # phase5.sh — LAN access for plans/local-intelligence-plan.md
 # Binds Ollama to all interfaces (it ships localhost-only) so other machines
 # on the same local network can use it; confirms Open WebUI already publishes
-# :3000 on all interfaces. Persists via the brew services env file
+# :3000 on all interfaces; pins the mDNS name to compute.local so clients
+# (client-setup.sh defaults to SERVER=compute.local) survive DHCP changes.
+# Persists via the brew services env file
 # (~/.homebrew/services/ollama.env), which brew merges into the launchd plist
 # on every start/restart/upgrade. Direct plist edits do NOT survive:
 # `brew services start` regenerates the plist from the formula template.
@@ -35,12 +37,18 @@ Options:
   -h, --help   Show this help
 
 Afterwards, from another machine on the same LAN:
-  Ollama:  http://<this-mac-ip>:11434   (API + OpenAI-compat /v1)
-  WebUI:   http://<this-mac-ip>:3000    (login required)
+  Ollama:  http://compute.local:11434   (API + OpenAI-compat /v1)
+  WebUI:   http://compute.local:3000    (login required)
+  (this-mac-ip works too; the .local name survives DHCP changes)
 EOF
 }
 
 lan_ip() {
+  local iface
+  iface="$(route -n get default 2>/dev/null | awk '/interface:/ {print $2; exit}')"
+  if [[ -n "$iface" ]]; then
+    ipconfig getifaddr "$iface" 2>/dev/null && return 0
+  fi
   ipconfig getifaddr en0 2>/dev/null \
     || ipconfig getifaddr en1 2>/dev/null \
     || ifconfig | awk '/inet / && $2 != "127.0.0.1" {print $2; exit}'
@@ -55,6 +63,49 @@ lan_name() {
 
 ollama_lan_bound() {
   lsof -iTCP:11434 -sTCP:LISTEN 2>/dev/null | grep -qE '\*:11434|0\.0\.0\.0:11434'
+}
+
+EXPECTED_HOST="compute"
+
+# Pin the mDNS name so re-running setup can never silently lose it
+# (macOS renames on Bonjour conflicts, e.g. "compute (2)").
+ensure_hostname() {
+  local current
+  current="$(scutil --get LocalHostName 2>/dev/null || true)"
+  if [[ "$current" == "$EXPECTED_HOST" ]]; then
+    log "hostname already $EXPECTED_HOST.local."
+    return 0
+  fi
+  if [[ "$CHECK_ONLY" -eq 1 ]]; then
+    warn "LocalHostName is '$current' (check-only; would set $EXPECTED_HOST via scutil)."
+    return 1
+  fi
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "[dry-run] would run: sudo scutil --set LocalHostName/ComputerName/HostName $EXPECTED_HOST[.*]"
+    return 0
+  fi
+  log "setting hostname to $EXPECTED_HOST.local (needs admin)..."
+  if sudo scutil --set LocalHostName "$EXPECTED_HOST" \
+     && sudo scutil --set ComputerName "$EXPECTED_HOST" \
+     && sudo scutil --set HostName "$EXPECTED_HOST.local"; then
+    log "hostname now $EXPECTED_HOST.local."
+  else
+    warn "could not set hostname here — run in your own Terminal:"
+    warn "  sudo scutil --set LocalHostName $EXPECTED_HOST && sudo scutil --set ComputerName $EXPECTED_HOST && sudo scutil --set HostName $EXPECTED_HOST.local"
+    return 1
+  fi
+}
+
+# The server is LAN-local: never probe it through an HTTP(S) proxy.
+# Corporate shells often export http_proxy with a loopback-only no_proxy,
+# which turns every .local/LAN-IP probe into a proxy 503. Subprocess-scoped.
+unproxy_lan() {
+  local ip name
+  ip="$(lan_ip 2>/dev/null || true)"
+  name="$(lan_name 2>/dev/null || true)"
+  local add="*.local${name:+,$name}${ip:+,$ip}"
+  export no_proxy="${no_proxy:+$no_proxy,}$add"
+  export NO_PROXY="${NO_PROXY:+$NO_PROXY,}$add"
 }
 
 preflight() {
@@ -138,8 +189,9 @@ firewall_note() {
 
 verify() {
   log "--- Phase 5 verify ---"
-  local fail=0 ip
+  local fail=0 ip name
   ip="$(lan_ip)"
+  name="$(lan_name)"
   if curl -sf --max-time 5 "http://$ip:11434/api/version" >/dev/null 2>&1; then
     log "ollama reachable via LAN: http://$ip:11434"
   elif ollama_lan_bound; then
@@ -154,6 +206,23 @@ verify() {
     log "open-webui published on all interfaces (this shell can't probe LAN IPs — confirm from another machine)."
   else
     warn "open-webui NOT reachable via LAN IP."
+    fail=1
+  fi
+  if [[ -n "$name" ]]; then
+    if curl -sf --max-time 5 "http://$name:11434/api/version" >/dev/null 2>&1; then
+      log "ollama reachable via name: http://$name:11434"
+    else
+      warn "ollama NOT reachable via $name (mDNS?) — IP http://$ip:11434 is the fallback."
+      fail=1
+    fi
+    if curl -sf --max-time 5 "http://$name:3000/health" >/dev/null 2>&1; then
+      log "open-webui reachable via name: http://$name:3000"
+    else
+      warn "open-webui NOT reachable via $name (mDNS?) — IP http://$ip:3000 is the fallback."
+      fail=1
+    fi
+  else
+    warn "no mDNS name (Bonjour unavailable) — use the LAN IP above."
     fail=1
   fi
   firewall_note
@@ -180,8 +249,10 @@ main() {
       *) die "unknown arg: $arg (try --help)" ;;
     esac
   done
+  unproxy_lan
   preflight
   local rc=0
+  ensure_hostname || rc=1
   ensure_ollama_lan || rc=1
   ensure_webui_lan || rc=1
   # Verification runs at the end of every phase, even on partial failure.
