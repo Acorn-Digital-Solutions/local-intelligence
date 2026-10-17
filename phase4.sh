@@ -209,7 +209,7 @@ OPENCODE_CFG="$HOME/.config/opencode/opencode.jsonc"
 # Agentic-capable local models (tool_calls proven via :11434/v1; the 32B
 # chat/coder + r1-distill narrate tool calls as text instead of invoking
 # them). First entry is the default for one-shot runs and smoke tests.
-AGENT_MODELS="muse-glimmer:30b-mlx gpt-oss:120b qwen3-coder:30b"
+AGENT_MODELS="muse-glimmer:30b-mlx gpt-oss:120b qwen3-coder:30b qwen3.8:27b-mlx"
 AGENT_MODEL="$(echo "$AGENT_MODELS" | awk '{print $1}')"
 
 ensure_opencode() {

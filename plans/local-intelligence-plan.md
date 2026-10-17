@@ -92,13 +92,14 @@ Phase 4 — chat UI with RAG (the friendly front door):
     never clobbered; schema taken from `https://opencode.ai/config.json`).
     It declares every Ollama chat model (embedding-only excluded);
     every `AGENT_MODELS` entry auto-pulled and flagged `tool_call`
-    (`muse-glimmer:30b-mlx`, `gpt-oss:120b`, `qwen3-coder:30b`).
+    (`muse-glimmer:30b-mlx`, `gpt-oss:120b`, `qwen3-coder:30b`,
+    `qwen3.8:27b-mlx`).
     Usage: plan §7.
   - Model caveat, proven live: `qwen2.5-coder:32b` and `deepseek-r1:32b`
     narrate tool calls as text (`tool_calls: null` via `:11434/v1`), so they
     cannot drive the agent loop — chat/generation only. `qwen3-coder:30b`,
-    `muse-glimmer:30b-mlx` and `gpt-oss:120b` emit real structured
-    `tool_calls` with correct argument schemas.
+    `muse-glimmer:30b-mlx`, `gpt-oss:120b` and `qwen3.8:27b-mlx` emit real
+    structured `tool_calls` with correct argument schemas.
 - Verify: model dropdown lists Phase 2 models, a doc-grounded question
   answers from the uploaded collection (automated probe asserts a
   plan-specific embedding name in the answer), and a non-interactive

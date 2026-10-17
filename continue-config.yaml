@@ -40,6 +40,18 @@ models:
       - chat
     capabilities:
       - tool_use
+  # Agentic challenger (2026-10-17): Qwen3.8 27B MLX, latest generation.
+  # Real tool_calls proven via :11434/v1; vision too. Placement
+  # provisional pending eval head-to-head (eval-results-2026-10-17.md).
+  - name: Qwen3.8 27B (agentic)
+    provider: ollama
+    model: qwen3.8:27b-mlx
+    apiBase: http://127.0.0.1:11434
+    roles:
+      - chat
+    capabilities:
+      - tool_use
+      - image_input
   # Coding Q&A + inline edits (Cmd+I): proven chat model, no tool use.
   - name: Qwen2.5-Coder 32B
     provider: ollama

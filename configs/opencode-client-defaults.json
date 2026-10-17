@@ -3,7 +3,8 @@
   "model_order": [
     "qwen3-coder:30b",
     "gpt-oss:120b",
-    "muse-glimmer:30b-mlx"
+    "muse-glimmer:30b-mlx",
+    "qwen3.8:27b-mlx"
   ],
   "small_model": "qwen2.5-coder:1.5b",
   "provider_name": "Ollama (server)",

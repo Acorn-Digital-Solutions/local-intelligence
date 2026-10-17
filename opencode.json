@@ -1,0 +1,8 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "$comment": "Temporary per-run grants written by eval.sh into each run directory (removed afterwards). Full agent autonomy for scoring — do not commit these into demo dirs.",
+  "permission": {
+    "edit": "allow",
+    "bash": "allow"
+  }
+}

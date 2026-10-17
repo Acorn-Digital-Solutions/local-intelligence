@@ -31,6 +31,15 @@ models:
       - chat
     capabilities:
       - tool_use
+  - name: Qwen3.8 27B (agentic)
+    provider: ollama
+    model: qwen3.8:27b-mlx
+    apiBase: http://__SERVER__:11434
+    roles:
+      - chat
+    capabilities:
+      - tool_use
+      - image_input
   - name: Qwen2.5-Coder 32B
     provider: ollama
     model: qwen2.5-coder:32b
