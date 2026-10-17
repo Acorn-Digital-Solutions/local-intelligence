@@ -15,6 +15,6 @@ sed -n '1,60p' demo/03-text-alice/alice.txt
 Then answer the three questions in TASK.md into `answers.md` (citing
 file:line for each answer) and run `python3 check.py`.
 
-Or agentic: `opencode run -m ollama/muse-glimmer:30b-mlx "complete the TASK in demo/03-text-alice/TASK.md"`.
+Or agentic: `opencode run -m ollama/qwen3.8:27b-mlx "complete the TASK in demo/03-text-alice/TASK.md"`.
 
 Pass = all three answers name the right characters, grounded in cited lines.

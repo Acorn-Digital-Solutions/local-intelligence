@@ -7,9 +7,21 @@ name: Local Config
 version: 0.0.1
 schema: v1
 models:
-  # Agent mode default (first chat model = picker default): Meta's 30B
-  # agent-tuned model, MLX-accelerated on Apple Silicon. Real tool_calls
-  # proven via :11434/v1; also takes image input (vision).
+  # Agent mode default (first chat model = picker default): Qwen3.8 27B
+  # MLX, latest generation. Won the 2026-10-17 head-to-head 3/3 at a
+  # fraction of Glimmer's wall time; real tool_calls proven via :11434/v1.
+  - name: Qwen3.8 27B (agentic)
+    provider: ollama
+    model: qwen3.8:27b-mlx
+    apiBase: http://127.0.0.1:11434
+    roles:
+      - chat
+    capabilities:
+      - tool_use
+      - image_input
+  # Fast backup: Meta's 30B agent-tuned model, MLX-accelerated on Apple
+  # Silicon. Real tool_calls proven via :11434/v1; also takes image
+  # input (vision).
   - name: Muse Glimmer 30B (agentic)
     provider: ollama
     model: muse-glimmer:30b-mlx
@@ -40,18 +52,6 @@ models:
       - chat
     capabilities:
       - tool_use
-  # Agentic challenger (2026-10-17): Qwen3.8 27B MLX, latest generation.
-  # Real tool_calls proven via :11434/v1; vision too. Placement
-  # provisional pending eval head-to-head (eval-results-2026-10-17.md).
-  - name: Qwen3.8 27B (agentic)
-    provider: ollama
-    model: qwen3.8:27b-mlx
-    apiBase: http://127.0.0.1:11434
-    roles:
-      - chat
-    capabilities:
-      - tool_use
-      - image_input
   # Coding Q&A + inline edits (Cmd+I): proven chat model, no tool use.
   - name: Qwen2.5-Coder 32B
     provider: ollama

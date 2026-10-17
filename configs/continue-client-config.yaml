@@ -6,6 +6,15 @@ name: Local Config (client)
 version: 0.0.1
 schema: v1
 models:
+  - name: Qwen3.8 27B (agentic)
+    provider: ollama
+    model: qwen3.8:27b-mlx
+    apiBase: http://__SERVER__:11434
+    roles:
+      - chat
+    capabilities:
+      - tool_use
+      - image_input
   - name: Muse Glimmer 30B (agentic)
     provider: ollama
     model: muse-glimmer:30b-mlx
@@ -31,15 +40,6 @@ models:
       - chat
     capabilities:
       - tool_use
-  - name: Qwen3.8 27B (agentic)
-    provider: ollama
-    model: qwen3.8:27b-mlx
-    apiBase: http://__SERVER__:11434
-    roles:
-      - chat
-    capabilities:
-      - tool_use
-      - image_input
   - name: Qwen2.5-Coder 32B
     provider: ollama
     model: qwen2.5-coder:32b

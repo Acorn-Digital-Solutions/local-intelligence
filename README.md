@@ -15,7 +15,7 @@ git. All commands run from the repo root.
 ./local-intelligence-setup.sh --phase4            # chat UI + opencode wiring
 curl -s localhost:11434/api/version               # Ollama up?
 ollama list                                       # models present?
-opencode run -m ollama/muse-glimmer:30b-mlx "Reply with exactly: OK"
+opencode run -m ollama/qwen3.8:27b-mlx "Reply with exactly: OK"
 ```
 
 Then open http://localhost:3000 (chat UI) and `demo/` (agent demos).
@@ -49,8 +49,9 @@ Full design rationale lives in `plans/`.
 
 1. **Runtimes** — Ollama (brew) + server, LM Studio check, `.venv` with `mlx-lm`.
 2. **Models** — coder + reasoning + 70B fallback + embeddings
-   (`--skip-70b` saves ~40GB). Agentic models (Glimmer, GPT-OSS, Qwen3)
-   are pulled by phase 4 / on demand — see the `add-ollama-model` skill.
+   (`--skip-70b` saves ~40GB). Agentic models (Qwen3.8, Glimmer,
+   GPT-OSS, Qwen3) are pulled by phase 4 / on demand — see the
+   `add-ollama-model` skill.
 3. **RAG (retired)** — the Qdrant + RAG-MCP layer was removed; agents
    navigate code with grep/glob/read at 131K context instead.
 4. **Chat UI + agent** — Open WebUI on `:3000`, opencode provider + MCP
@@ -68,16 +69,18 @@ Full design rationale lives in `plans/`.
 
 ```bash
 cd ~/code/myproj && opencode                                   # interactive TUI
-opencode run -m ollama/muse-glimmer:30b-mlx "add retry logic"  # one-shot
+opencode run -m ollama/qwen3.8:27b-mlx "add retry logic"  # one-shot
 opencode run -m ollama/gpt-oss:120b "..."                      # harder tasks
 opencode models ollama                                         # check wiring
 ```
 
-Model guide: Glimmer for agentic edits (fast, MLX), GPT-OSS 120B when
-quality beats speed, Qwen3 backup, Qwen2.5-Coder for plain chat Q&A
-(no tools — it narrates tool calls as text instead of invoking them,
-so switch to Glimmer for anything needing web, MCP, or file tools),
-DeepSeek-R1 for step-by-step reasoning. Pre-allow permissions per
+Model guide: Qwen3.8 27B (MLX) for agentic edits (default since the
+2026-10-17 eval — swept Glimmer 3/3 at a fraction of the time),
+Glimmer as fast backup, GPT-OSS 120B when quality beats speed, Qwen3
+backup, Qwen2.5-Coder for plain chat Q&A (no tools — it narrates tool
+calls as text instead of invoking them, so switch to Qwen3.8 for
+anything needing web, MCP, or file tools), DeepSeek-R1 for
+step-by-step reasoning. Pre-allow permissions per
 project with a local `opencode.json`
 (`{"permission":{"edit":"allow","bash":"deny"}}`); never `--auto`.
 
@@ -85,8 +88,9 @@ project with a local `opencode.json`
 `cp continue-config.yaml ~/.continue/config.yaml`. Switch the input-bar
 mode toggle to **Agent** — MCP tools (web search/fetch, thinking) don't
 exist in Chat mode, and models asked to use tools there just narrate fake calls
-as text. Agent mode needs the `Muse Glimmer 30B (agentic)` picker entry —
-Qwen2.5 narrates tool calls as text and can't drive tools. `Cmd+Enter`
+as text. Agent mode needs the `Qwen3.8 27B (agentic)` picker entry
+(first chat model = default) — Qwen2.5 narrates tool calls as text and
+can't drive tools. `Cmd+Enter`
 accepts each approval prompt (approvals are per-call by design). See plan
 §8 + Agent-mode notes.
 
