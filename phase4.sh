@@ -10,7 +10,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_PY="$ROOT_DIR/.venv/bin/python"
-WEBUI_IMAGE="ghcr.io/open-webui/open-webui:v0.11.4"
+WEBUI_IMAGE="ghcr.io/open-webui/open-webui:v0.12.3"
 WEBUI_NAME="open-webui"
 WEBUI_URL="http://127.0.0.1:3000"
 OLLAMA_URL="http://127.0.0.1:11434"
